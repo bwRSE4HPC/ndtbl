@@ -170,8 +170,6 @@ read_group(const std::string& path)
 
   const std::array<Axis, Dim> axes = detail::fixed_axes<Dim>(metadata.axes);
   const Grid<Dim> grid(axes);
-  const std::size_t value_count = metadata.point_count * metadata.field_count;
-
   if (metadata.value_type == scalar_type::float32) {
 #if NDTBL_ENABLE_MMAP
     const std::shared_ptr<const std::uint8_t> payload_owner =
@@ -185,7 +183,8 @@ read_group(const std::string& path)
 #else
     // Keep this non-const so the payload buffer can be moved into the
     // read-only FieldGroup storage instead of copied during load.
-    std::vector<float> values = detail::read_payload<float>(is, value_count);
+    std::vector<float> values =
+      detail::read_payload<float>(is, layout.value_count);
     return RuntimeFieldGroup<Dim>(
       FieldGroup<float, Dim>(grid, metadata.field_names, std::move(values)));
 #endif
@@ -204,7 +203,8 @@ read_group(const std::string& path)
 #else
     // Keep this non-const so the payload buffer can be moved into the
     // read-only FieldGroup storage instead of copied during load.
-    std::vector<double> values = detail::read_payload<double>(is, value_count);
+    std::vector<double> values =
+      detail::read_payload<double>(is, layout.value_count);
     return RuntimeFieldGroup<Dim>(
       FieldGroup<double, Dim>(grid, metadata.field_names, std::move(values)));
 #endif
