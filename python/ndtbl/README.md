@@ -73,6 +73,9 @@ print(loaded.field_names)
 print(loaded.values[1, 0, :])
 ```
 
+`write_group` refuses to write files larger than 128 MiB by default. Pass
+`max_size_mib=...` when a larger output is intentional.
+
 The `values` array shape is `axis_0 x axis_1 x ... x field`.
 
 ### Demo notebook

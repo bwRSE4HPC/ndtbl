@@ -179,6 +179,59 @@ def test_write_group_uses_expected_little_endian_layout(tmp_path) -> None:
     np.testing.assert_array_equal(read_group(path).values, group.values)
 
 
+def test_write_group_enforces_default_size_limit_without_truncating(
+    tmp_path,
+) -> None:
+    path = tmp_path / "existing.ndtbl"
+    original = b"keep this file"
+    path.write_bytes(original)
+    group = FieldGroup(
+        axes=(UniformAxis(0.0, 1.0, 2048), UniformAxis(0.0, 1.0, 2048)),
+        field_names=("A", "B", "C", "D"),
+        values=np.empty((2048, 2048, 4), dtype=np.float64),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="ndtbl file exceeds the configured size limit",
+    ) as error:
+        write_group(path, group)
+
+    assert "Pass max_size_mib to raise the limit explicitly." in str(
+        error.value
+    )
+    assert path.read_bytes() == original
+
+
+def test_write_group_allows_explicitly_raised_size_limit(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "raised-limit.ndtbl"
+
+    with pytest.raises(
+        ValueError,
+        match="ndtbl file exceeds the configured size limit",
+    ):
+        write_group(path, sample_uniform_group, max_size_mib=0.00001)
+    assert not path.exists()
+
+    write_group(path, sample_uniform_group, max_size_mib=1.0)
+
+    loaded = read_group(path)
+    np.testing.assert_array_equal(loaded.values, sample_uniform_group.values)
+
+
+def test_write_group_rejects_invalid_max_size_mib(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "invalid-limit.ndtbl"
+
+    with pytest.raises(ValueError, match="max_size_mib must be positive"):
+        write_group(path, sample_uniform_group, max_size_mib=0.0)
+
+
 def test_read_metadata_rejects_nonzero_reserved_header_field(
     tmp_path,
     sample_uniform_group: FieldGroup,
