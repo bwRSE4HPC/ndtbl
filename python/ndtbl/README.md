@@ -14,7 +14,7 @@ The package is useful when you want to:
 - inspect an existing table on a machine without the C++ toolchain
 - generate small synthetic tables for tests, examples, and development
 - query one concrete grid point from the command line
-- read or write `.ndtbl` files directly from Python or NumPy workflows
+- read or write `.ndtbl` files directly from Python workflows using NumPy arrays
 
 ## 🔧 Features
 
@@ -102,13 +102,6 @@ Inspect an existing file:
 
 ```bash
 ndtbl inspect example.ndtbl
-```
-
-`inspect` prints an ASCII-art header by default after the file is read
-successfully. Suppress it when needed:
-
-```bash
-ndtbl inspect example.ndtbl --no-banner
 ```
 
 Limit the number of printed sample points:
