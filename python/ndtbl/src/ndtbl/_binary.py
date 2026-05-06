@@ -173,6 +173,15 @@ def _metadata_size(metadata: GroupMetadata) -> int:
     return total
 
 
+def serialized_group_size(group: FieldGroup) -> int:
+    """Return the exact serialized byte size for a field group."""
+    metadata = group.metadata()
+    payload_size = (
+        metadata.point_count * metadata.field_count * metadata.dtype.itemsize
+    )
+    return _metadata_size(metadata) + payload_size
+
+
 def _read_layout_from_stream(stream: BinaryIO) -> ParsedLayout:
     """Read ndtbl metadata and validate the encoded payload offset."""
     magic = _read_exact(stream, len(MAGIC))

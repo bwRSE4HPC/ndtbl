@@ -9,10 +9,9 @@ from .generate import (
     estimate_generated_group_size,
     generate_group,
 )
-from .io import read_group, write_group
+from .io import DEFAULT_MAX_SIZE_MIB, read_group, write_group
 from .model import ExplicitAxis, FieldGroup, GroupMetadata, UniformAxis
 
-DEFAULT_MAX_SIZE_MIB = 128.0
 _INSPECT_BANNER = r"""
 |========================================|
 |           __  __    __       ___       |
@@ -425,7 +424,7 @@ def generate_command(
     _enforce_generation_size_limit(estimate, dtype, max_size_mib)
     try:
         group = generate_group(axes, linear_fields, np.dtype(dtype))
-        write_group(output_path, group)
+        write_group(output_path, group, max_size_mib=max_size_mib)
     except (OSError, ValueError) as error:
         raise click.ClickException(str(error)) from error
     click.echo(f"wrote {output_path}")

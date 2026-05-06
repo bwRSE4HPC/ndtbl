@@ -1,8 +1,7 @@
 # ndtbl Lookup Benchmarks
 
-This directory contains developer-only lookup-time benchmarks for the C++
-`ndtbl` library. The benchmarks use
-[Google Benchmark](https://github.com/google/benchmark) and focus on
+This directory contains lookup-time benchmarks for the C++ `ndtbl` library.
+The benchmarks use [Google Benchmark](https://github.com/google/benchmark) and focus on
 interpolation cost after a table has already been constructed in memory.
 
 The suite does not measure file I/O, `.ndtbl` parsing, memory mapping, or table
@@ -63,7 +62,7 @@ cmake -B build -Dndtbl_BUILD_BENCHMARKS=ON
 cmake --build build --target ndtbl_lookup_benchmarks
 ```
 
-Run a short smoke benchmark:
+Run a short benchmark:
 
 ```bash
 ./build/benchmarks/ndtbl_lookup_benchmarks
