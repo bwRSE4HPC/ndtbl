@@ -34,6 +34,11 @@ pow_size(std::size_t base, std::size_t exponent)
 template<std::size_t Dim, std::size_t PointsPerAxis>
 class TensorStencil
 {
+  static_assert(Dim > 0, "ndtbl grids must have at least one dimension");
+  static_assert(
+    PointsPerAxis > 0,
+    "ndtbl tensor stencils must contain at least one point per axis");
+
 public:
   /// Number of dimensions.
   static constexpr std::size_t dimensions = Dim;
@@ -105,6 +110,8 @@ using CubicStencil = TensorStencil<Dim, 4>;
 template<std::size_t Dim>
 class Grid
 {
+  static_assert(Dim > 0, "ndtbl grids must have at least one dimension");
+
 public:
   /// Number of dimensions.
   static constexpr std::size_t dimensions = Dim;
