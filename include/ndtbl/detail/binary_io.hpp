@@ -25,7 +25,10 @@ namespace detail {
  * This constant is part of the binary file format implementation and is not
  * intended to be consumed directly by library users.
  */
-static const char file_magic[8] = { 'N', 'D', 'T', 'B', 'L', '\0', '\0', '\0' };
+static constexpr char file_magic[8] = { 'N', 'D',  'T',  'B',
+                                        'L', '\0', '\0', '\0' };
+
+static constexpr std::uint8_t current_format_version = 1u;
 
 /**
  * @brief Write one exact byte sequence to a binary stream.
@@ -213,7 +216,7 @@ require_zero(std::uint64_t value, const std::string& what)
   }
 }
 
-inline std::size_t
+inline constexpr std::size_t
 fixed_header_size()
 {
   return sizeof(file_magic) + sizeof(std::uint8_t) + sizeof(std::uint8_t) +
@@ -284,7 +287,7 @@ write_group_stream_impl(std::ostream& os,
   const std::size_t payload_offset = metadata_size(metadata);
 
   write_bytes(os, file_magic, sizeof(file_magic));
-  write_uint_le<std::uint8_t>(os, 1u);
+  write_uint_le<std::uint8_t>(os, current_format_version);
   write_uint_le<std::uint8_t>(os,
                               static_cast<std::uint8_t>(metadata.value_type));
   write_uint_le<std::uint16_t>(os, 0u);
@@ -381,7 +384,7 @@ verify_magic(std::istream& is)
   }
 }
 
-inline std::size_t
+inline constexpr std::size_t
 scalar_size(scalar_type type)
 {
   if (type == scalar_type::float32) {
@@ -413,7 +416,7 @@ read_group_layout_impl(std::istream& is)
   verify_magic(is);
 
   const std::uint8_t version = read_uint_le<std::uint8_t>(is);
-  if (version != 1u) {
+  if (version != current_format_version) {
     throw std::runtime_error("unsupported ndtbl version");
   }
 
