@@ -28,8 +28,6 @@ namespace detail {
 static constexpr char file_magic[8] = { 'N', 'D',  'T',  'B',
                                         'L', '\0', '\0', '\0' };
 
-static constexpr std::uint8_t current_format_version = 1u;
-
 /**
  * @brief Write one exact byte sequence to a binary stream.
  *

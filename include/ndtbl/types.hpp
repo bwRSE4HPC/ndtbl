@@ -33,6 +33,11 @@ enum class bounds_policy : std::uint8_t
 };
 
 /**
+ * @brief Current ndtbl binary file format version.
+ */
+static constexpr std::uint8_t current_format_version = 1u;
+
+/**
  * @brief Map a supported C++ scalar type to the ndtbl on-disk type tag.
  *
  * Only `float` and `double` are supported in the current implementation.
