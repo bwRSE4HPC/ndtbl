@@ -3,6 +3,7 @@
 #include "ndtbl/types.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <iterator>
 #include <stdexcept>
@@ -201,6 +202,10 @@ public:
     double value,
     bounds_policy policy = bounds_policy::clamp) const
   {
+    if (!std::isfinite(value)) {
+      throw std::out_of_range("axis query coordinate must be finite");
+    }
+
     if (policy == bounds_policy::throw_error &&
         (value < min_ || value > max_)) {
       throw std::out_of_range("axis query coordinate outside bounds");

@@ -298,6 +298,26 @@ TEST_CASE("single-point axes reject out-of-domain coordinates in throw mode",
     std::out_of_range);
 }
 
+TEST_CASE("axes reject non-finite query coordinates", "[axis][interpolation]")
+{
+  const ndtbl::Axis uniform = ndtbl::Axis::uniform(0.0, 1.0, 3);
+  const ndtbl::Axis explicit_axis =
+    ndtbl::Axis::from_coordinates({ 0.0, 0.5, 1.0 });
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double infinity = std::numeric_limits<double>::infinity();
+
+  REQUIRE_THROWS_AS(uniform.bracket(nan), std::out_of_range);
+  REQUIRE_THROWS_AS(uniform.bracket(nan, ndtbl::bounds_policy::throw_error),
+                    std::out_of_range);
+  REQUIRE_THROWS_AS(explicit_axis.bracket(nan), std::out_of_range);
+  REQUIRE_THROWS_AS(
+    explicit_axis.bracket(nan, ndtbl::bounds_policy::throw_error),
+    std::out_of_range);
+
+  REQUIRE_THROWS_AS(uniform.bracket(infinity), std::out_of_range);
+  REQUIRE_THROWS_AS(explicit_axis.bracket(-infinity), std::out_of_range);
+}
+
 TEST_CASE("field group rejects uniform-axis queries outside the domain",
           "[field_group][interpolation]")
 {
