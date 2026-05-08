@@ -159,7 +159,7 @@ runtime-erased combined lookup for representative 2D, 4D, and 6D tables. See
 Build the benchmark target:
 
 ```bash
-cmake -B build -Dndtbl_BUILD_BENCHMARKS=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Release -Dndtbl_BUILD_BENCHMARKS=ON
 cmake --build build --target ndtbl_lookup_benchmarks
 ```
 
