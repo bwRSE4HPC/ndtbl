@@ -133,10 +133,10 @@ read_float_le(std::istream& is)
   return value;
 }
 
-template<class Value>
+template<class Stored>
 struct payload_uint
 {
-  typedef typename std::conditional<sizeof(Value) == sizeof(std::uint32_t),
+  typedef typename std::conditional<sizeof(Stored) == sizeof(std::uint32_t),
                                     std::uint32_t,
                                     std::uint64_t>::type type;
 };
@@ -255,16 +255,16 @@ metadata_size(const GroupMetadata& metadata)
 /**
  * @brief Internal implementation for writing raw metadata and payload data.
  *
- * @tparam Value Scalar payload type stored in the payload vector.
+ * @tparam Stored Scalar payload type stored in the payload vector.
  * @param os Destination stream in binary mode.
  * @param metadata File metadata describing the payload layout.
  * @param payload Point-major interleaved field payload.
  */
-template<class Value>
+template<class Stored>
 inline void
 write_group_stream_impl(std::ostream& os,
                         const GroupMetadata& metadata,
-                        const PayloadView<Value>& payload)
+                        const PayloadView<Stored>& payload)
 {
   if (metadata.axes.size() != metadata.dimension) {
     throw std::invalid_argument(
@@ -327,7 +327,7 @@ write_group_stream_impl(std::ostream& os,
                   payload.byte_size());
     } else {
       for (std::size_t index = 0; index < payload.size(); ++index) {
-        write_float_le<Value, typename payload_uint<Value>::type>(
+        write_float_le<Stored, typename payload_uint<Stored>::type>(
           os, payload[index]);
       }
     }
@@ -337,18 +337,18 @@ write_group_stream_impl(std::ostream& os,
 /**
  * @brief Internal implementation for writing a typed field group.
  *
- * @tparam Value Scalar payload type stored in the group.
+ * @tparam Stored Scalar payload type stored in the group.
  * @tparam Dim Grid dimensionality of the group.
  * @param os Destination stream in binary mode.
  * @param group Typed field group to serialize.
  * @see write_group_stream_impl(std::ostream&, const GroupMetadata&,
- *                              const std::vector<Value>&)
+ *                              const std::vector<Stored>&)
  */
-template<class Value, std::size_t Dim>
+template<class Stored, std::size_t Dim>
 inline void
-write_group_stream_impl(std::ostream& os, const FieldGroup<Value, Dim>& group)
+write_group_stream_impl(std::ostream& os, const FieldGroup<Stored, Dim>& group)
 {
-  GroupMetadata metadata = { scalar_type_of<Value>(),
+  GroupMetadata metadata = { scalar_type_of<Stored>(),
                              Dim,
                              group.field_count(),
                              group.point_count(),
@@ -358,11 +358,11 @@ write_group_stream_impl(std::ostream& os, const FieldGroup<Value, Dim>& group)
   write_group_stream_impl(os, metadata, group.interleaved_values());
 }
 
-template<class Value>
+template<class Stored>
 inline void
 write_group_stream_impl(std::ostream& os,
                         const GroupMetadata& metadata,
-                        const std::vector<Value>& payload)
+                        const std::vector<Stored>& payload)
 {
   write_group_stream_impl(os, metadata, payload_view(payload));
 }
@@ -500,16 +500,16 @@ read_group_metadata_impl(std::istream& is)
 /**
  * @brief Read a contiguous payload block from a binary stream.
  *
- * @tparam Value Scalar payload type to deserialize.
+ * @tparam Stored Scalar payload type to deserialize.
  * @param is Source stream positioned at the start of the payload.
  * @param value_count Number of scalar values to read.
  * @return Payload vector with `value_count` entries.
  */
-template<class Value>
-inline std::vector<Value>
+template<class Stored>
+inline std::vector<Stored>
 read_payload(std::istream& is, std::size_t value_count)
 {
-  std::vector<Value> values(value_count);
+  std::vector<Stored> values(value_count);
   if (value_count == 0) {
     return values;
   }
@@ -517,13 +517,13 @@ read_payload(std::istream& is, std::size_t value_count)
   if (host_is_little_endian()) {
     read_bytes(is,
                reinterpret_cast<char*>(values.data()),
-               values.size() * sizeof(Value));
+               values.size() * sizeof(Stored));
     return values;
   }
 
   for (std::size_t index = 0; index < value_count; ++index) {
     values[index] =
-      read_float_le<Value, typename payload_uint<Value>::type>(is);
+      read_float_le<Stored, typename payload_uint<Stored>::type>(is);
   }
   return values;
 }

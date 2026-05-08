@@ -25,7 +25,7 @@ namespace ndtbl {
  * axis varies fastest before stepping to the next field tuple. One prepared
  * interpolation stencil can accumulate all fields together.
  */
-template<class Value, std::size_t Dim>
+template<class Stored, std::size_t Dim>
 class FieldGroup
 {
 public:
@@ -38,8 +38,8 @@ public:
    */
   FieldGroup(const Grid<Dim>& grid,
              const std::vector<std::string>& field_names,
-             const std::vector<Value>& interleaved_values)
-    : FieldGroup(grid, field_names, std::vector<Value>(interleaved_values))
+             const std::vector<Stored>& interleaved_values)
+    : FieldGroup(grid, field_names, std::vector<Stored>(interleaved_values))
   {
   }
 
@@ -53,7 +53,7 @@ public:
    */
   FieldGroup(const Grid<Dim>& grid,
              const std::vector<std::string>& field_names,
-             std::vector<Value>&& interleaved_values)
+             std::vector<Stored>&& interleaved_values)
     : grid_(grid)
     , field_names_(field_names)
   {
@@ -71,7 +71,7 @@ public:
    */
   FieldGroup(const Grid<Dim>& grid,
              const std::vector<std::string>& field_names,
-             const PayloadView<Value>& interleaved_values,
+             const PayloadView<Stored>& interleaved_values,
              std::shared_ptr<const std::uint8_t> payload_owner)
     : grid_(grid)
     , field_names_(field_names)
@@ -117,7 +117,7 @@ public:
    *
    * @return Point-major interleaved payload view.
    */
-  PayloadView<Value> interleaved_values() const { return interleaved_values_; }
+  PayloadView<Stored> interleaved_values() const { return interleaved_values_; }
 
   /**
    * @brief Resolve a field name to its local field index.
@@ -147,9 +147,9 @@ public:
    * @see evaluate_all_linear(const std::array<double, Dim>&)
    */
   template<class Stencil>
-  std::vector<Value> evaluate_all(const Stencil& stencil) const
+  std::vector<Stored> evaluate_all(const Stencil& stencil) const
   {
-    std::vector<Value> results(field_count(), Value(0));
+    std::vector<Stored> results(field_count(), Stored(0));
     evaluate_all_into(stencil, results.data());
     return results;
   }
@@ -164,15 +164,15 @@ public:
    * @see evaluate_all(const Stencil&)
    */
   template<class Stencil>
-  void evaluate_all_into(const Stencil& stencil, Value* results) const
+  void evaluate_all_into(const Stencil& stencil, Stored* results) const
   {
-    std::fill(results, results + field_count(), Value(0));
+    std::fill(results, results + field_count(), Stored(0));
     for (std::size_t point = 0; point < Stencil::points; ++point) {
       const double weight = stencil.weight(point);
       const std::size_t base = stencil.point_index(point) * field_count();
       for (std::size_t field = 0; field < field_count(); ++field) {
         results[field] +=
-          static_cast<Value>(weight * interleaved_values_[base + field]);
+          static_cast<Stored>(weight * interleaved_values_[base + field]);
       }
     }
   }
@@ -186,7 +186,7 @@ public:
    * @param policy Bounds handling behavior for out-of-domain coordinates.
    * @see evaluate_all(const Stencil&)
    */
-  std::vector<Value> evaluate_all_linear(
+  std::vector<Stored> evaluate_all_linear(
     const std::array<double, Dim>& coordinates,
     bounds_policy policy = bounds_policy::clamp) const
   {
@@ -200,11 +200,11 @@ public:
    * @param coordinates Query coordinates in grid axis order.
    * @param results Output buffer with space for `field_count()` values.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
-   * @see evaluate_all_into(const Stencil&, Value*)
+   * @see evaluate_all_into(const Stencil&, Stored*)
    */
   void evaluate_all_linear_into(
     const std::array<double, Dim>& coordinates,
-    Value* results,
+    Stored* results,
     bounds_policy policy = bounds_policy::clamp) const
   {
     evaluate_all_into(grid_.prepare_linear(coordinates, policy), results);
@@ -223,7 +223,7 @@ public:
    * @return Cubically interpolated field values in storage order.
    * @see Grid::prepare_cubic
    */
-  std::vector<Value> evaluate_all_cubic(
+  std::vector<Stored> evaluate_all_cubic(
     const std::array<double, Dim>& coordinates,
     bounds_policy policy = bounds_policy::clamp) const
   {
@@ -241,21 +241,21 @@ public:
    */
   void evaluate_all_cubic_into(
     const std::array<double, Dim>& coordinates,
-    Value* results,
+    Stored* results,
     bounds_policy policy = bounds_policy::clamp) const
   {
     evaluate_all_into(grid_.prepare_cubic(coordinates, policy), results);
   }
 
 private:
-  void adopt_owned_payload(std::vector<Value>&& interleaved_values)
+  void adopt_owned_payload(std::vector<Stored>&& interleaved_values)
   {
-    const std::shared_ptr<std::vector<Value>> storage =
-      std::make_shared<std::vector<Value>>(std::move(interleaved_values));
+    const std::shared_ptr<std::vector<Stored>> storage =
+      std::make_shared<std::vector<Stored>>(std::move(interleaved_values));
     const std::uint8_t* const data =
       storage->empty() ? nullptr
                        : reinterpret_cast<const std::uint8_t*>(storage->data());
-    interleaved_values_ = PayloadView<Value>(data, storage->size());
+    interleaved_values_ = PayloadView<Stored>(data, storage->size());
     payload_owner_ = std::shared_ptr<const std::uint8_t>(storage, data);
   }
 
@@ -276,7 +276,7 @@ private:
 private:
   Grid<Dim> grid_;
   std::vector<std::string> field_names_;
-  PayloadView<Value> interleaved_values_;
+  PayloadView<Stored> interleaved_values_;
   std::shared_ptr<const std::uint8_t> payload_owner_;
 };
 

@@ -20,15 +20,15 @@ namespace ndtbl {
 /**
  * @brief Write a typed field group to an already opened binary stream.
  *
- * @tparam Value Scalar payload type stored in the group.
+ * @tparam Stored Scalar payload type stored in the group.
  * @tparam Dim Grid dimensionality of the group.
  * @param os Destination stream in binary mode.
  * @param group Field group to serialize.
- * @see write_group(const std::string&, const FieldGroup<Value, Dim>&)
+ * @see write_group(const std::string&, const FieldGroup<Stored, Dim>&)
  */
-template<class Value, std::size_t Dim>
+template<class Stored, std::size_t Dim>
 inline void
-write_group_stream(std::ostream& os, const FieldGroup<Value, Dim>& group)
+write_group_stream(std::ostream& os, const FieldGroup<Stored, Dim>& group)
 {
   detail::write_group_stream_impl(os, group);
 }
@@ -40,18 +40,18 @@ write_group_stream(std::ostream& os, const FieldGroup<Value, Dim>& group)
  * interleaved point-major payload in row-major axis order, but not a typed
  * `FieldGroup`.
  *
- * @tparam Value Scalar payload type stored in the payload vector.
+ * @tparam Stored Scalar payload type stored in the payload vector.
  * @param os Destination stream in binary mode.
  * @param metadata Group metadata to encode into the file header.
  * @param interleaved_values Point-major field payload to serialize in row-major
  *                           axis order.
- * @see write_group_stream(std::ostream&, const FieldGroup<Value, Dim>&)
+ * @see write_group_stream(std::ostream&, const FieldGroup<Stored, Dim>&)
  */
-template<class Value>
+template<class Stored>
 inline void
 write_group_stream(std::ostream& os,
                    const GroupMetadata& metadata,
-                   const std::vector<Value>& interleaved_values)
+                   const std::vector<Stored>& interleaved_values)
 {
   detail::write_group_stream_impl(os, metadata, interleaved_values);
 }
@@ -59,15 +59,15 @@ write_group_stream(std::ostream& os,
 /**
  * @brief Write a typed field group to a binary ndtbl file.
  *
- * @tparam Value Scalar payload type stored in the group.
+ * @tparam Stored Scalar payload type stored in the group.
  * @tparam Dim Grid dimensionality of the group.
  * @param path Output file path.
  * @param group Field group to serialize.
- * @see write_group_stream(std::ostream&, const FieldGroup<Value, Dim>&)
+ * @see write_group_stream(std::ostream&, const FieldGroup<Stored, Dim>&)
  */
-template<class Value, std::size_t Dim>
+template<class Stored, std::size_t Dim>
 inline void
-write_group(const std::string& path, const FieldGroup<Value, Dim>& group)
+write_group(const std::string& path, const FieldGroup<Stored, Dim>& group)
 {
   std::ofstream os(path.c_str(), std::ios::binary);
   if (!os.is_open()) {
@@ -79,19 +79,19 @@ write_group(const std::string& path, const FieldGroup<Value, Dim>& group)
 /**
  * @brief Write a raw ndtbl payload with explicit metadata to a file.
  *
- * @tparam Value Scalar payload type stored in the payload vector.
+ * @tparam Stored Scalar payload type stored in the payload vector.
  * @param path Output file path.
  * @param metadata Group metadata to encode into the file header.
  * @param interleaved_values Point-major field payload to serialize in row-major
  *                           axis order.
  * @see write_group_stream(std::ostream&, const GroupMetadata&,
- *                         const std::vector<Value>&)
+ *                         const std::vector<Stored>&)
  */
-template<class Value>
+template<class Stored>
 inline void
 write_group(const std::string& path,
             const GroupMetadata& metadata,
-            const std::vector<Value>& interleaved_values)
+            const std::vector<Stored>& interleaved_values)
 {
   std::ofstream os(path.c_str(), std::ios::binary);
   if (!os.is_open()) {

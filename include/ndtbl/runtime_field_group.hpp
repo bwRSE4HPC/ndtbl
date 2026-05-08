@@ -14,12 +14,12 @@
 
 namespace ndtbl {
 
-template<class Value, std::size_t Dim>
+template<class Stored, std::size_t Dim>
 void
-write_group_stream(std::ostream& os, const FieldGroup<Value, Dim>& group);
+write_group_stream(std::ostream& os, const FieldGroup<Stored, Dim>& group);
 
 /**
- * @brief Runtime-erased wrapper around a typed `FieldGroup<Value, Dim>`.
+ * @brief Runtime-erased wrapper around a typed `FieldGroup<Stored, Dim>`.
  *
  * The dimensionality remains part of the type. Only the stored scalar payload
  * type is selected from file metadata at runtime.
@@ -42,13 +42,13 @@ public:
   /**
    * @brief Construct a runtime-erased wrapper from a typed field group.
    *
-   * @tparam Value Scalar payload type stored in the source group.
+   * @tparam Stored Scalar payload type stored in the source group.
    * @param group Typed field group to wrap.
    * @see FieldGroup
    */
-  template<class Value>
-  explicit RuntimeFieldGroup(const FieldGroup<Value, Dim>& group)
-    : impl_(std::make_shared<Model<Value>>(group))
+  template<class Stored>
+  explicit RuntimeFieldGroup(const FieldGroup<Stored, Dim>& group)
+    : impl_(std::make_shared<Model<Stored>>(group))
   {
   }
 
@@ -238,17 +238,17 @@ private:
     virtual void write(std::ostream& os) const = 0;
   };
 
-  template<class Value>
+  template<class Stored>
   struct Model : Concept
   {
-    explicit Model(const FieldGroup<Value, Dim>& group)
+    explicit Model(const FieldGroup<Stored, Dim>& group)
       : group_(group)
     {
     }
 
     std::size_t field_count() const override { return group_.field_count(); }
 
-    scalar_type value_type() const override { return scalar_type_of<Value>(); }
+    scalar_type value_type() const override { return scalar_type_of<Stored>(); }
 
     std::vector<std::string> field_names() const override
     {
@@ -270,7 +270,7 @@ private:
         coordinates,
         values,
         policy,
-        typename std::is_same<Value, Output>::type());
+        typename std::is_same<Stored, Output>::type());
     }
 
     void evaluate_all_cubic_into(const std::array<double, Dim>& coordinates,
@@ -281,7 +281,7 @@ private:
         coordinates,
         values,
         policy,
-        typename std::is_same<Value, Output>::type());
+        typename std::is_same<Stored, Output>::type());
     }
 
     void write(std::ostream& os) const override
@@ -289,7 +289,7 @@ private:
       write_group_stream(os, group_);
     }
 
-    FieldGroup<Value, Dim> group_;
+    FieldGroup<Stored, Dim> group_;
 
   private:
     void evaluate_all_linear_into_impl(
@@ -307,7 +307,7 @@ private:
       bounds_policy policy,
       std::false_type) const
     {
-      std::vector<Value>& scratch = thread_scratch();
+      std::vector<Stored>& scratch = thread_scratch();
       const std::size_t count = group_.field_count();
       if (scratch.size() < count) {
         scratch.resize(count);
@@ -332,7 +332,7 @@ private:
       bounds_policy policy,
       std::false_type) const
     {
-      std::vector<Value>& scratch = thread_scratch();
+      std::vector<Stored>& scratch = thread_scratch();
       const std::size_t count = group_.field_count();
       if (scratch.size() < count) {
         scratch.resize(count);
@@ -342,13 +342,13 @@ private:
       copy_scratch_to_output(scratch, count, values);
     }
 
-    static std::vector<Value>& thread_scratch()
+    static std::vector<Stored>& thread_scratch()
     {
-      static thread_local std::vector<Value> scratch;
+      static thread_local std::vector<Stored> scratch;
       return scratch;
     }
 
-    static void copy_scratch_to_output(const std::vector<Value>& scratch,
+    static void copy_scratch_to_output(const std::vector<Stored>& scratch,
                                        std::size_t count,
                                        Output* values)
     {
