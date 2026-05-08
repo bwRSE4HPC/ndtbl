@@ -225,6 +225,17 @@ metadata_size(const GroupMetadata& metadata)
   return total;
 }
 
+inline std::size_t
+axis_point_count(const std::vector<Axis>& axes)
+{
+  std::size_t point_count = 1;
+  for (std::size_t axis = 0; axis < axes.size(); ++axis) {
+    point_count =
+      checked_multiply_size(point_count, axes[axis].size(), "point count");
+  }
+  return point_count;
+}
+
 /**
  * @brief Internal implementation for writing raw metadata and payload data.
  *
@@ -247,6 +258,16 @@ write_group_stream_impl(std::ostream& os,
   if (metadata.field_names.size() != metadata.field_count) {
     throw std::invalid_argument(
       "ndtbl metadata field count does not match field names");
+  }
+
+  if (metadata.value_type != scalar_type_of<Stored>()) {
+    throw std::invalid_argument(
+      "ndtbl metadata scalar type does not match payload type");
+  }
+
+  if (metadata.point_count != axis_point_count(metadata.axes)) {
+    throw std::invalid_argument(
+      "ndtbl point count does not match axis extents");
   }
 
   const std::size_t expected_values = checked_multiply_size(
@@ -435,12 +456,7 @@ read_group_layout_impl(std::istream& is)
     metadata.field_names.push_back(read_string(is));
   }
 
-  std::size_t expected_point_count = 1;
-  for (std::size_t axis = 0; axis < metadata.axes.size(); ++axis) {
-    expected_point_count = checked_multiply_size(
-      expected_point_count, metadata.axes[axis].size(), "point count");
-  }
-  if (expected_point_count != metadata.point_count) {
+  if (axis_point_count(metadata.axes) != metadata.point_count) {
     throw std::runtime_error("ndtbl point count does not match axis extents");
   }
 

@@ -8,6 +8,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -122,6 +123,55 @@ TEST_CASE("typed loader supports caller-selected runtime output precision",
   REQUIRE(values[0] == Catch::Approx(3.0f));
 
   std::remove(path.c_str());
+}
+
+TEST_CASE("raw writer round-trips explicit metadata", "[io]")
+{
+  const ndtbl::GroupMetadata metadata = {
+    ndtbl::scalar_type::float32,           1,           2, 3,
+    { ndtbl::Axis::uniform(0.0, 2.0, 3) }, { "A", "B" }
+  };
+  const std::vector<float> payload = { 0.0f, 10.0f, 1.0f, 11.0f, 2.0f, 12.0f };
+
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, metadata, payload);
+
+  const ndtbl::RuntimeFieldGroup<1> loaded = ndtbl::read_group<1>(path);
+  std::array<double, 2> values = { 0.0, 0.0 };
+  loaded.evaluate_all_linear_into({ 0.5 }, values.data());
+  REQUIRE(values[0] == Catch::Approx(0.5));
+  REQUIRE(values[1] == Catch::Approx(10.5));
+
+  std::remove(path.c_str());
+}
+
+TEST_CASE("raw writer rejects metadata scalar type mismatches", "[io]")
+{
+  const ndtbl::GroupMetadata metadata = {
+    ndtbl::scalar_type::float64,           1,      1, 2,
+    { ndtbl::Axis::uniform(0.0, 1.0, 2) }, { "A" }
+  };
+  std::ostringstream os;
+
+  REQUIRE_THROWS_AS(
+    ndtbl::write_group_stream(os, metadata, std::vector<float>({ 0.0f, 1.0f })),
+    std::invalid_argument);
+}
+
+TEST_CASE("raw writer rejects point counts mismatching axis extents", "[io]")
+{
+  const ndtbl::GroupMetadata metadata = { ndtbl::scalar_type::float32,
+                                          2,
+                                          1,
+                                          3,
+                                          { ndtbl::Axis::uniform(0.0, 1.0, 2),
+                                            ndtbl::Axis::uniform(0.0, 1.0, 2) },
+                                          { "A" } };
+  std::ostringstream os;
+
+  REQUIRE_THROWS_AS(ndtbl::write_group_stream(
+                      os, metadata, std::vector<float>({ 0.0f, 1.0f, 2.0f })),
+                    std::invalid_argument);
 }
 
 TEST_CASE("runtime field group can be evaluated concurrently", "[io]")
