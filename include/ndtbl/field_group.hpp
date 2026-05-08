@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ndtbl/detail/size_math.hpp"
 #include "ndtbl/grid.hpp"
 #include "ndtbl/payload.hpp"
 
@@ -266,7 +267,8 @@ private:
         "field group must contain at least one field");
     }
 
-    const std::size_t expected_size = grid_.point_count() * field_names_.size();
+    const std::size_t expected_size = detail::checked_multiply_size(
+      grid_.point_count(), field_names_.size(), "field payload value count");
     if (interleaved_values_.size() != expected_size) {
       throw std::invalid_argument(
         "field payload size does not match grid and field count");

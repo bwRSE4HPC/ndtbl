@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ndtbl/axis.hpp"
+#include "ndtbl/detail/size_math.hpp"
 
 #include <algorithm>
 #include <array>
@@ -135,9 +136,11 @@ public:
     strides_[Dim - 1] = 1;
     for (std::size_t axis = Dim; axis-- > 0;) {
       extents_[axis] = axes_[axis].size();
-      point_count_ *= extents_[axis];
+      point_count_ = detail::checked_multiply_size(
+        point_count_, extents_[axis], "point count");
       if (axis + 1 < Dim) {
-        strides_[axis] = strides_[axis + 1] * extents_[axis + 1];
+        strides_[axis] = detail::checked_multiply_size(
+          strides_[axis + 1], extents_[axis + 1], "grid stride");
       }
     }
   }

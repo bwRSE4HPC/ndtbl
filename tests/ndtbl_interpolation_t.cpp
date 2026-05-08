@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdio>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -169,6 +170,34 @@ static_assert(ndtbl::LinearStencil<4>::points == 16,
               "4D linear interpolation should use 16 table points");
 static_assert(ndtbl::CubicStencil<4>::points == 256,
               "4D cubic interpolation should use 256 table points");
+
+TEST_CASE("grid rejects shape products exceeding supported size",
+          "[grid][validation]")
+{
+  const std::size_t huge_extent =
+    std::numeric_limits<std::size_t>::max() / 2u + 1u;
+  const std::array<ndtbl::Axis, 2> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+    ndtbl::Axis::uniform(0.0, 1.0, huge_extent),
+  };
+
+  REQUIRE_THROWS_AS(ndtbl::Grid<2>(axes), std::runtime_error);
+}
+
+TEST_CASE("field group rejects payload shape products exceeding supported size",
+          "[field_group][validation]")
+{
+  const std::size_t huge_extent =
+    std::numeric_limits<std::size_t>::max() / 2u + 1u;
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, huge_extent),
+  };
+  const ndtbl::Grid<1> grid(axes);
+
+  REQUIRE_THROWS_AS(
+    (ndtbl::FieldGroup<double, 1>(grid, { "A", "B" }, std::vector<double>())),
+    std::runtime_error);
+}
 
 TEST_CASE("field group exactly recovers linear fields on uniform axes in 2D",
           "[field_group][interpolation]")
