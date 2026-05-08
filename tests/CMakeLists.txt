@@ -15,6 +15,7 @@ endif()
 
 # Include Catch2's CMake helper functions (e.g., catch_discover_tests).
 include(Catch)
+find_package(Threads REQUIRED)
 
 # Create a single test binary that compiles all test files.
 add_executable(ndtbl_tests)
@@ -31,6 +32,7 @@ target_link_libraries(ndtbl_tests
   PUBLIC
     ndtbl
     Catch2::Catch2WithMain
+    Threads::Threads
 )
 
 # allow user to run tests with `make test` or `ctest`

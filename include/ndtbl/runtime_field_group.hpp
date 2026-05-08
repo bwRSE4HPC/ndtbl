@@ -9,6 +9,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace ndtbl {
@@ -22,10 +23,16 @@ write_group_stream(std::ostream& os, const FieldGroup<Value, Dim>& group);
  *
  * The dimensionality remains part of the type. Only the stored scalar payload
  * type is selected from file metadata at runtime.
+ *
+ * @tparam Dim Grid dimensionality of the group.
+ * @tparam Output Floating-point type produced by interpolation calls.
  */
-template<std::size_t Dim>
+template<std::size_t Dim, class Output = double>
 class RuntimeFieldGroup
 {
+  static_assert(std::is_floating_point<Output>::value,
+                "RuntimeFieldGroup output type must be floating point");
+
 public:
   /**
    * @brief Construct an empty runtime-erased group handle.
@@ -124,14 +131,14 @@ public:
    *
    * @param coordinates Query coordinates in grid axis order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
-   * @return Interpolated field values converted to `double`.
+   * @return Interpolated field values converted to `Output`.
    * @see evaluate_all_linear_into
    */
-  std::vector<double> evaluate_all_linear(
+  std::vector<Output> evaluate_all_linear(
     const std::array<double, Dim>& coordinates,
     bounds_policy policy = bounds_policy::clamp) const
   {
-    std::vector<double> values(field_count(), 0.0);
+    std::vector<Output> values(field_count(), Output(0));
     evaluate_all_linear_into(coordinates, values.data(), policy);
     return values;
   }
@@ -147,7 +154,7 @@ public:
    */
   void evaluate_all_linear_into(
     const std::array<double, Dim>& coordinates,
-    double* values,
+    Output* values,
     bounds_policy policy = bounds_policy::clamp) const
   {
     if (!impl_) {
@@ -165,14 +172,14 @@ public:
    *
    * @param coordinates Query coordinates in grid axis order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
-   * @return Cubically interpolated field values converted to `double`.
+   * @return Cubically interpolated field values converted to `Output`.
    * @see evaluate_all_cubic_into
    */
-  std::vector<double> evaluate_all_cubic(
+  std::vector<Output> evaluate_all_cubic(
     const std::array<double, Dim>& coordinates,
     bounds_policy policy = bounds_policy::clamp) const
   {
-    std::vector<double> values(field_count(), 0.0);
+    std::vector<Output> values(field_count(), Output(0));
     evaluate_all_cubic_into(coordinates, values.data(), policy);
     return values;
   }
@@ -188,7 +195,7 @@ public:
    */
   void evaluate_all_cubic_into(
     const std::array<double, Dim>& coordinates,
-    double* values,
+    Output* values,
     bounds_policy policy = bounds_policy::clamp) const
   {
     if (!impl_) {
@@ -222,11 +229,11 @@ private:
     virtual std::size_t field_index(const std::string& field_name) const = 0;
     virtual void evaluate_all_linear_into(
       const std::array<double, Dim>& coordinates,
-      double* values,
+      Output* values,
       bounds_policy policy) const = 0;
     virtual void evaluate_all_cubic_into(
       const std::array<double, Dim>& coordinates,
-      double* values,
+      Output* values,
       bounds_policy policy) const = 0;
     virtual void write(std::ostream& os) const = 0;
   };
@@ -236,7 +243,6 @@ private:
   {
     explicit Model(const FieldGroup<Value, Dim>& group)
       : group_(group)
-      , scratch_(group.field_count(), Value(0))
     {
     }
 
@@ -257,23 +263,25 @@ private:
     }
 
     void evaluate_all_linear_into(const std::array<double, Dim>& coordinates,
-                                  double* values,
+                                  Output* values,
                                   bounds_policy policy) const override
     {
-      group_.evaluate_all_linear_into(coordinates, scratch_.data(), policy);
-      for (std::size_t field = 0; field < scratch_.size(); ++field) {
-        values[field] = static_cast<double>(scratch_[field]);
-      }
+      evaluate_all_linear_into_impl(
+        coordinates,
+        values,
+        policy,
+        typename std::is_same<Value, Output>::type());
     }
 
     void evaluate_all_cubic_into(const std::array<double, Dim>& coordinates,
-                                 double* values,
+                                 Output* values,
                                  bounds_policy policy) const override
     {
-      group_.evaluate_all_cubic_into(coordinates, scratch_.data(), policy);
-      for (std::size_t field = 0; field < scratch_.size(); ++field) {
-        values[field] = static_cast<double>(scratch_[field]);
-      }
+      evaluate_all_cubic_into_impl(
+        coordinates,
+        values,
+        policy,
+        typename std::is_same<Value, Output>::type());
     }
 
     void write(std::ostream& os) const override
@@ -282,7 +290,72 @@ private:
     }
 
     FieldGroup<Value, Dim> group_;
-    mutable std::vector<Value> scratch_;
+
+  private:
+    void evaluate_all_linear_into_impl(
+      const std::array<double, Dim>& coordinates,
+      Output* values,
+      bounds_policy policy,
+      std::true_type) const
+    {
+      group_.evaluate_all_linear_into(coordinates, values, policy);
+    }
+
+    void evaluate_all_linear_into_impl(
+      const std::array<double, Dim>& coordinates,
+      Output* values,
+      bounds_policy policy,
+      std::false_type) const
+    {
+      std::vector<Value>& scratch = thread_scratch();
+      const std::size_t count = group_.field_count();
+      if (scratch.size() < count) {
+        scratch.resize(count);
+      }
+
+      group_.evaluate_all_linear_into(coordinates, scratch.data(), policy);
+      copy_scratch_to_output(scratch, count, values);
+    }
+
+    void evaluate_all_cubic_into_impl(
+      const std::array<double, Dim>& coordinates,
+      Output* values,
+      bounds_policy policy,
+      std::true_type) const
+    {
+      group_.evaluate_all_cubic_into(coordinates, values, policy);
+    }
+
+    void evaluate_all_cubic_into_impl(
+      const std::array<double, Dim>& coordinates,
+      Output* values,
+      bounds_policy policy,
+      std::false_type) const
+    {
+      std::vector<Value>& scratch = thread_scratch();
+      const std::size_t count = group_.field_count();
+      if (scratch.size() < count) {
+        scratch.resize(count);
+      }
+
+      group_.evaluate_all_cubic_into(coordinates, scratch.data(), policy);
+      copy_scratch_to_output(scratch, count, values);
+    }
+
+    static std::vector<Value>& thread_scratch()
+    {
+      static thread_local std::vector<Value> scratch;
+      return scratch;
+    }
+
+    static void copy_scratch_to_output(const std::vector<Value>& scratch,
+                                       std::size_t count,
+                                       Output* values)
+    {
+      for (std::size_t field = 0; field < count; ++field) {
+        values[field] = static_cast<Output>(scratch[field]);
+      }
+    }
   };
 
   std::shared_ptr<const Concept> impl_;

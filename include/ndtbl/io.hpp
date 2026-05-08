@@ -104,13 +104,15 @@ write_group(const std::string& path,
  * @brief Write a runtime-erased field group to a binary ndtbl file.
  *
  * @tparam Dim Grid dimensionality of the group.
+ * @tparam Output Scalar output type used by runtime-erased interpolation.
  * @param path Output file path.
  * @param group Runtime-erased field group to serialize.
  * @see RuntimeFieldGroup
  */
-template<std::size_t Dim>
+template<std::size_t Dim, class Output>
 inline void
-write_group(const std::string& path, const RuntimeFieldGroup<Dim>& group)
+write_group(const std::string& path,
+            const RuntimeFieldGroup<Dim, Output>& group)
 {
   std::ofstream os(path.c_str(), std::ios::binary);
   if (!os.is_open()) {
@@ -146,14 +148,15 @@ read_group_metadata(const std::string& path)
  * The file dimension must match the compile-time `Dim` argument.
  *
  * @tparam Dim Expected grid dimensionality of the file.
+ * @tparam Output Output type used by runtime-erased interpolation.
  * @param path Input file path.
- * @return Runtime-erased field group with either float or double
- *         payload storage.
+ * @return Runtime-erased field group with either float or double payload
+ *         storage and `Output` interpolation results.
  * @see read_group_metadata
  * @see RuntimeFieldGroup
  */
-template<std::size_t Dim>
-inline RuntimeFieldGroup<Dim>
+template<std::size_t Dim, class Output = double>
+inline RuntimeFieldGroup<Dim, Output>
 read_group(const std::string& path)
 {
   std::ifstream is(path.c_str(), std::ios::binary);
@@ -175,7 +178,7 @@ read_group(const std::string& path)
     const std::shared_ptr<const std::uint8_t> payload_owner =
       detail::map_payload_bytes(
         path, layout.payload_offset, layout.payload_size);
-    return RuntimeFieldGroup<Dim>(FieldGroup<float, Dim>(
+    return RuntimeFieldGroup<Dim, Output>(FieldGroup<float, Dim>(
       grid,
       metadata.field_names,
       PayloadView<float>(payload_owner.get(), layout.value_count),
@@ -185,7 +188,7 @@ read_group(const std::string& path)
     // read-only FieldGroup storage instead of copied during load.
     std::vector<float> values =
       detail::read_payload<float>(is, layout.value_count);
-    return RuntimeFieldGroup<Dim>(
+    return RuntimeFieldGroup<Dim, Output>(
       FieldGroup<float, Dim>(grid, metadata.field_names, std::move(values)));
 #endif
   }
@@ -195,7 +198,7 @@ read_group(const std::string& path)
     const std::shared_ptr<const std::uint8_t> payload_owner =
       detail::map_payload_bytes(
         path, layout.payload_offset, layout.payload_size);
-    return RuntimeFieldGroup<Dim>(FieldGroup<double, Dim>(
+    return RuntimeFieldGroup<Dim, Output>(FieldGroup<double, Dim>(
       grid,
       metadata.field_names,
       PayloadView<double>(payload_owner.get(), layout.value_count),
@@ -205,7 +208,7 @@ read_group(const std::string& path)
     // read-only FieldGroup storage instead of copied during load.
     std::vector<double> values =
       detail::read_payload<double>(is, layout.value_count);
-    return RuntimeFieldGroup<Dim>(
+    return RuntimeFieldGroup<Dim, Output>(
       FieldGroup<double, Dim>(grid, metadata.field_names, std::move(values)));
 #endif
   }
