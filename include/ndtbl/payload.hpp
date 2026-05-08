@@ -26,6 +26,7 @@ public:
    */
   PayloadView()
     : data_(nullptr)
+    , typed_data_(nullptr)
     , size_(0)
   {
   }
@@ -38,6 +39,21 @@ public:
    */
   PayloadView(const std::uint8_t* data, std::size_t size)
     : data_(data)
+    , typed_data_(nullptr)
+    , size_(size)
+  {
+  }
+
+  /**
+   * @brief Construct a payload view from typed scalar storage.
+   *
+   * @param data Pointer to the first typed payload value.
+   * @param size Number of logical `Stored` entries in the payload.
+   */
+  PayloadView(const Stored* data, std::size_t size)
+    : data_(data == nullptr ? nullptr
+                            : reinterpret_cast<const std::uint8_t*>(data))
+    , typed_data_(data)
     , size_(size)
   {
   }
@@ -64,7 +80,15 @@ public:
   const std::uint8_t* byte_data() const { return data_; }
 
   /**
-   * @brief Read one payload value by index.
+   * @brief Return typed payload storage when the view was built from it.
+   *
+   * @return Typed pointer, or `nullptr` when direct typed loads would not be
+   *         well-defined.
+   */
+  const Stored* typed_data() const { return typed_data_; }
+
+  /**
+   * @brief Read one payload value by index with bounds checking.
    *
    * This uses `memcpy` rather than typed pointer dereferencing so the same
    * implementation stays valid for memory-mapped payloads whose file offset is
@@ -73,12 +97,23 @@ public:
    * @param index Zero-based payload index.
    * @return Deserialized payload value.
    */
-  Stored operator[](std::size_t index) const
+  Stored at(std::size_t index) const
   {
     if (index >= size_) {
       throw std::out_of_range("ndtbl payload index out of range");
     }
 
+    return unchecked(index);
+  }
+
+  /**
+   * @brief Read one payload value without bounds checking.
+   *
+   * @param index Zero-based payload index known to be valid.
+   * @return Deserialized payload value.
+   */
+  Stored unchecked(std::size_t index) const
+  {
     Stored value;
     std::memcpy(&value, data_ + index * sizeof(Stored), sizeof(Stored));
     return value;
@@ -86,6 +121,7 @@ public:
 
 private:
   const std::uint8_t* data_;
+  const Stored* typed_data_;
   std::size_t size_;
 };
 
@@ -100,9 +136,7 @@ template<class Stored>
 inline PayloadView<Stored>
 payload_view(const std::vector<Stored>& values)
 {
-  const std::uint8_t* data =
-    values.empty() ? nullptr
-                   : reinterpret_cast<const std::uint8_t*>(values.data());
+  const Stored* data = values.empty() ? nullptr : values.data();
   return PayloadView<Stored>(data, values.size());
 }
 

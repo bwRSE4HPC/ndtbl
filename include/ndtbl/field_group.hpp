@@ -167,15 +167,16 @@ public:
   template<class Stencil>
   void evaluate_all_into(const Stencil& stencil, Stored* results) const
   {
-    std::fill(results, results + field_count(), Stored(0));
-    for (std::size_t point = 0; point < Stencil::points; ++point) {
-      const double weight = stencil.weight(point);
-      const std::size_t base = stencil.point_index(point) * field_count();
-      for (std::size_t field = 0; field < field_count(); ++field) {
-        results[field] +=
-          static_cast<Stored>(weight * interleaved_values_[base + field]);
-      }
+    const std::size_t fields = field_count();
+    const Stored* const typed_values = interleaved_values_.typed_data();
+
+    std::fill(results, results + fields, Stored(0));
+    if (typed_values != nullptr) {
+      evaluate_all_into_typed(stencil, typed_values, fields, results);
+      return;
     }
+
+    evaluate_all_into_bytes(stencil, fields, results);
   }
 
   /**
@@ -249,15 +250,46 @@ public:
   }
 
 private:
+  template<class Stencil>
+  void evaluate_all_into_typed(const Stencil& stencil,
+                               const Stored* values,
+                               std::size_t fields,
+                               Stored* results) const
+  {
+    for (std::size_t point = 0; point < Stencil::points; ++point) {
+      const double weight = stencil.weight(point);
+      const std::size_t base = stencil.point_index(point) * fields;
+      for (std::size_t field = 0; field < fields; ++field) {
+        const Stored value = values[base + field];
+        results[field] += static_cast<Stored>(weight * value);
+      }
+    }
+  }
+
+  template<class Stencil>
+  void evaluate_all_into_bytes(const Stencil& stencil,
+                               std::size_t fields,
+                               Stored* results) const
+  {
+    for (std::size_t point = 0; point < Stencil::points; ++point) {
+      const double weight = stencil.weight(point);
+      const std::size_t base = stencil.point_index(point) * fields;
+      for (std::size_t field = 0; field < fields; ++field) {
+        const Stored value = interleaved_values_.unchecked(base + field);
+        results[field] += static_cast<Stored>(weight * value);
+      }
+    }
+  }
+
   void adopt_owned_payload(std::vector<Stored>&& interleaved_values)
   {
     const std::shared_ptr<std::vector<Stored>> storage =
       std::make_shared<std::vector<Stored>>(std::move(interleaved_values));
-    const std::uint8_t* const data =
-      storage->empty() ? nullptr
-                       : reinterpret_cast<const std::uint8_t*>(storage->data());
+    const Stored* const data = storage->empty() ? nullptr : storage->data();
     interleaved_values_ = PayloadView<Stored>(data, storage->size());
-    payload_owner_ = std::shared_ptr<const std::uint8_t>(storage, data);
+    payload_owner_ = std::shared_ptr<const std::uint8_t>(
+      storage,
+      data == nullptr ? nullptr : reinterpret_cast<const std::uint8_t*>(data));
   }
 
   void validate_payload_shape() const

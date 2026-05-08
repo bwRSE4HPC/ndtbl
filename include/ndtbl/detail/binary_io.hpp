@@ -322,7 +322,7 @@ write_group_stream_impl(std::ostream& os,
     } else {
       for (std::size_t index = 0; index < payload.size(); ++index) {
         write_float_le<Stored, typename payload_uint<Stored>::type>(
-          os, payload[index]);
+          os, payload.unchecked(index));
       }
     }
   }

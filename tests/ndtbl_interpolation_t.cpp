@@ -6,8 +6,11 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -197,6 +200,45 @@ TEST_CASE("field group rejects payload shape products exceeding supported size",
   REQUIRE_THROWS_AS(
     (ndtbl::FieldGroup<double, 1>(grid, { "A", "B" }, std::vector<double>())),
     std::runtime_error);
+}
+
+TEST_CASE("payload view keeps checked access separate from typed fast access",
+          "[payload]")
+{
+  const std::vector<double> payload = { 1.0, 2.0, 3.0 };
+  const ndtbl::PayloadView<double> view = ndtbl::payload_view(payload);
+
+  REQUIRE(view.typed_data() == payload.data());
+  REQUIRE(view.at(1) == Catch::Approx(2.0));
+  REQUIRE(view.unchecked(2) == Catch::Approx(3.0));
+  REQUIRE_THROWS_AS(view.at(payload.size()), std::out_of_range);
+}
+
+TEST_CASE("field group evaluates unaligned byte-backed payloads",
+          "[field_group][payload][interpolation]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const std::vector<double> payload = { 1.0, 3.0 };
+
+  std::shared_ptr<std::vector<std::uint8_t>> storage =
+    std::make_shared<std::vector<std::uint8_t>>(
+      payload.size() * sizeof(double) + 1u);
+  std::uint8_t* const unaligned_data = storage->data() + 1u;
+  std::memcpy(unaligned_data, payload.data(), payload.size() * sizeof(double));
+
+  const ndtbl::PayloadView<double> view(unaligned_data, payload.size());
+  REQUIRE(view.typed_data() == nullptr);
+
+  const std::shared_ptr<const std::uint8_t> owner(storage, unaligned_data);
+  const ndtbl::FieldGroup<double, 1> group(
+    ndtbl::Grid<1>(axes), { "A" }, view, owner);
+
+  std::array<double, 1> values = { 0.0 };
+  group.evaluate_all_linear_into({ 0.25 }, values.data());
+
+  REQUIRE(values[0] == Catch::Approx(1.5));
 }
 
 TEST_CASE("field group exactly recovers linear fields on uniform axes in 2D",
