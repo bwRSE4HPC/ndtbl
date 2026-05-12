@@ -16,10 +16,10 @@ namespace ndtbl {
 
 template<class Stored, std::size_t Dim>
 void
-write_group_stream(std::ostream& os, const FieldGroup<Stored, Dim>& group);
+write_group_stream(std::ostream& os, const FieldGroup<Dim, Stored>& group);
 
 /**
- * @brief Runtime-erased wrapper around a typed `FieldGroup<Stored, Dim>`.
+ * @brief Runtime-erased wrapper around a typed `FieldGroup<Dim, Stored>`.
  *
  * The dimensionality remains part of the type. Only the stored scalar payload
  * type is selected from file metadata at runtime.
@@ -47,7 +47,7 @@ public:
    * @see FieldGroup
    */
   template<class Stored>
-  explicit RuntimeFieldGroup(const FieldGroup<Stored, Dim>& group)
+  explicit RuntimeFieldGroup(const FieldGroup<Dim, Stored>& group)
     : impl_(std::make_shared<Model<Stored>>(group))
   {
   }
@@ -241,7 +241,7 @@ private:
   template<class Stored>
   struct Model : Concept
   {
-    explicit Model(const FieldGroup<Stored, Dim>& group)
+    explicit Model(const FieldGroup<Dim, Stored>& group)
       : group_(group)
     {
     }
@@ -289,7 +289,7 @@ private:
       write_group_stream(os, group_);
     }
 
-    FieldGroup<Stored, Dim> group_;
+    FieldGroup<Dim, Stored> group_;
 
   private:
     void evaluate_all_linear_into_impl(

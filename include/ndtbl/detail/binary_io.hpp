@@ -340,7 +340,7 @@ write_group_stream_impl(std::ostream& os,
  */
 template<class Stored, std::size_t Dim>
 inline void
-write_group_stream_impl(std::ostream& os, const FieldGroup<Stored, Dim>& group)
+write_group_stream_impl(std::ostream& os, const FieldGroup<Dim, Stored>& group)
 {
   GroupMetadata metadata = { scalar_type_of<Stored>(),
                              Dim,

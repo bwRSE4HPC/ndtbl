@@ -25,8 +25,11 @@ namespace ndtbl {
  * `point0.field0, point0.field1, ..., point1.field0, ...` where the last grid
  * axis varies fastest before stepping to the next field tuple. One prepared
  * interpolation stencil can accumulate all fields together.
+ *
+ * @tparam Dim Grid dimensionality of the group.
+ * @tparam Stored Scalar payload type stored in the group.
  */
-template<class Stored, std::size_t Dim>
+template<std::size_t Dim, class Stored>
 class FieldGroup
 {
 public:

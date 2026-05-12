@@ -24,11 +24,11 @@ namespace ndtbl {
  * @tparam Dim Grid dimensionality of the group.
  * @param os Destination stream in binary mode.
  * @param group Field group to serialize.
- * @see write_group(const std::string&, const FieldGroup<Stored, Dim>&)
+ * @see write_group(const std::string&, const FieldGroup<Dim, Stored>&)
  */
 template<class Stored, std::size_t Dim>
 inline void
-write_group_stream(std::ostream& os, const FieldGroup<Stored, Dim>& group)
+write_group_stream(std::ostream& os, const FieldGroup<Dim, Stored>& group)
 {
   detail::write_group_stream_impl(os, group);
 }
@@ -45,7 +45,7 @@ write_group_stream(std::ostream& os, const FieldGroup<Stored, Dim>& group)
  * @param metadata Group metadata to encode into the file header.
  * @param interleaved_values Point-major field payload to serialize in row-major
  *                           axis order.
- * @see write_group_stream(std::ostream&, const FieldGroup<Stored, Dim>&)
+ * @see write_group_stream(std::ostream&, const FieldGroup<Dim, Stored>&)
  */
 template<class Stored>
 inline void
@@ -63,11 +63,11 @@ write_group_stream(std::ostream& os,
  * @tparam Dim Grid dimensionality of the group.
  * @param path Output file path.
  * @param group Field group to serialize.
- * @see write_group_stream(std::ostream&, const FieldGroup<Stored, Dim>&)
+ * @see write_group_stream(std::ostream&, const FieldGroup<Dim, Stored>&)
  */
 template<class Stored, std::size_t Dim>
 inline void
-write_group(const std::string& path, const FieldGroup<Stored, Dim>& group)
+write_group(const std::string& path, const FieldGroup<Dim, Stored>& group)
 {
   std::ofstream os(path.c_str(), std::ios::binary);
   if (!os.is_open()) {
@@ -178,7 +178,7 @@ read_group(const std::string& path)
     const std::shared_ptr<const std::uint8_t> payload_owner =
       detail::map_payload_bytes(
         path, layout.payload_offset, layout.payload_size);
-    return RuntimeFieldGroup<Dim, Output>(FieldGroup<float, Dim>(
+    return RuntimeFieldGroup<Dim, Output>(FieldGroup<Dim, float>(
       grid,
       metadata.field_names,
       PayloadView<float>(payload_owner.get(), layout.value_count),
@@ -189,7 +189,7 @@ read_group(const std::string& path)
     std::vector<float> values =
       detail::read_payload<float>(is, layout.value_count);
     return RuntimeFieldGroup<Dim, Output>(
-      FieldGroup<float, Dim>(grid, metadata.field_names, std::move(values)));
+      FieldGroup<Dim, float>(grid, metadata.field_names, std::move(values)));
 #endif
   }
 
@@ -198,7 +198,7 @@ read_group(const std::string& path)
     const std::shared_ptr<const std::uint8_t> payload_owner =
       detail::map_payload_bytes(
         path, layout.payload_offset, layout.payload_size);
-    return RuntimeFieldGroup<Dim, Output>(FieldGroup<double, Dim>(
+    return RuntimeFieldGroup<Dim, Output>(FieldGroup<Dim, double>(
       grid,
       metadata.field_names,
       PayloadView<double>(payload_owner.get(), layout.value_count),
@@ -209,7 +209,7 @@ read_group(const std::string& path)
     std::vector<double> values =
       detail::read_payload<double>(is, layout.value_count);
     return RuntimeFieldGroup<Dim, Output>(
-      FieldGroup<double, Dim>(grid, metadata.field_names, std::move(values)));
+      FieldGroup<Dim, double>(grid, metadata.field_names, std::move(values)));
 #endif
   }
 

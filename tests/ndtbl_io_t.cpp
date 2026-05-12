@@ -19,7 +19,7 @@ TEST_CASE("typed loader round-trips metadata and float payloads", "[io]")
     ndtbl::Axis::uniform(0.0, 1.0, 2),
     ndtbl::Axis::uniform(0.0, 1.0, 2),
   };
-  const ndtbl::FieldGroup<float, 2> group(
+  const ndtbl::FieldGroup<2, float> group(
     ndtbl::Grid<2>(axes),
     { "A", "B" },
     { 0.0f, 10.0f, 1.0f, 11.0f, 2.0f, 12.0f, 3.0f, 13.0f });
@@ -50,7 +50,7 @@ TEST_CASE("runtime field group can be rewritten after reading", "[io]")
     ndtbl::Axis::uniform(0.0, 1.0, 2),
     ndtbl::Axis::uniform(0.0, 1.0, 2),
   };
-  const ndtbl::FieldGroup<double, 2> group(
+  const ndtbl::FieldGroup<2, double> group(
     ndtbl::Grid<2>(axes),
     { "A", "B" },
     { 0.0, 10.0, 1.0, 11.0, 2.0, 12.0, 3.0, 13.0 });
@@ -81,7 +81,7 @@ TEST_CASE("runtime field group supports caller-selected output precision",
   };
   const ndtbl::Grid<1> grid(axes);
 
-  const ndtbl::FieldGroup<float, 1> float_group(
+  const ndtbl::FieldGroup<1, float> float_group(
     grid, { "A", "B" }, { 0.0f, 10.0f, 1.0f, 12.0f });
   const ndtbl::RuntimeFieldGroup<1, float> float_runtime(float_group);
   std::array<float, 2> float_values = { 0.0f, 0.0f };
@@ -89,7 +89,7 @@ TEST_CASE("runtime field group supports caller-selected output precision",
   REQUIRE(float_values[0] == Catch::Approx(0.5f));
   REQUIRE(float_values[1] == Catch::Approx(11.0f));
 
-  const ndtbl::FieldGroup<double, 1> double_group(
+  const ndtbl::FieldGroup<1, double> double_group(
     grid, { "A", "B" }, { 0.0, 10.0, 1.0, 12.0 });
   const ndtbl::RuntimeFieldGroup<1, float> converted_runtime(double_group);
   converted_runtime.evaluate_all_linear_into({ 0.25 }, float_values.data());
@@ -110,7 +110,7 @@ TEST_CASE("typed loader supports caller-selected runtime output precision",
   const std::array<ndtbl::Axis, 1> axes = {
     ndtbl::Axis::uniform(0.0, 1.0, 2),
   };
-  const ndtbl::FieldGroup<double, 1> group(
+  const ndtbl::FieldGroup<1, double> group(
     ndtbl::Grid<1>(axes), { "A" }, { 2.0, 4.0 });
 
   const std::string path = ndtbl_test::temporary_path();
@@ -186,7 +186,7 @@ TEST_CASE("runtime field group can be evaluated concurrently", "[io]")
     payload.push_back(10.0f + 2.0f * coordinate);
   }
 
-  const ndtbl::FieldGroup<float, 1> group(
+  const ndtbl::FieldGroup<1, float> group(
     ndtbl::Grid<1>(axes), { "A", "B" }, payload);
   const ndtbl::RuntimeFieldGroup<1> runtime(group);
 
@@ -225,7 +225,7 @@ TEST_CASE("typed loader rejects mismatched dimensions", "[io]")
   const std::array<ndtbl::Axis, 1> axes = {
     ndtbl::Axis::uniform(0.0, 1.0, 2),
   };
-  const ndtbl::FieldGroup<double, 1> group(
+  const ndtbl::FieldGroup<1, double> group(
     ndtbl::Grid<1>(axes), { "A" }, { 0.0, 1.0 });
 
   const std::string path = ndtbl_test::temporary_path();
@@ -241,7 +241,7 @@ TEST_CASE("typed loader rejects truncated payload files", "[io]")
   const std::array<ndtbl::Axis, 1> axes = {
     ndtbl::Axis::uniform(0.0, 1.0, 2),
   };
-  const ndtbl::FieldGroup<double, 1> group(
+  const ndtbl::FieldGroup<1, double> group(
     ndtbl::Grid<1>(axes), { "A" }, { 0.0, 1.0 });
 
   const std::string path = ndtbl_test::temporary_path();
@@ -262,7 +262,7 @@ TEST_CASE("writer produces the documented little-endian layout", "[io]")
   const std::array<ndtbl::Axis, 1> axes = {
     ndtbl::Axis::uniform(2.0, 2.0, 1),
   };
-  const ndtbl::FieldGroup<float, 1> group(
+  const ndtbl::FieldGroup<1, float> group(
     ndtbl::Grid<1>(axes), { "A" }, { 1.5f });
 
   const std::string path = ndtbl_test::temporary_path();
@@ -298,7 +298,7 @@ TEST_CASE("typed loader rejects nonzero reserved header fields", "[io]")
   const std::array<ndtbl::Axis, 1> axes = {
     ndtbl::Axis::uniform(0.0, 1.0, 2),
   };
-  const ndtbl::FieldGroup<double, 1> group(
+  const ndtbl::FieldGroup<1, double> group(
     ndtbl::Grid<1>(axes), { "A" }, { 0.0, 1.0 });
 
   const std::string path = ndtbl_test::temporary_path();
@@ -319,7 +319,7 @@ TEST_CASE("typed loader rejects mismatched payload offsets", "[io]")
   const std::array<ndtbl::Axis, 1> axes = {
     ndtbl::Axis::uniform(0.0, 1.0, 2),
   };
-  const ndtbl::FieldGroup<double, 1> group(
+  const ndtbl::FieldGroup<1, double> group(
     ndtbl::Grid<1>(axes), { "A" }, { 0.0, 1.0 });
 
   const std::string path = ndtbl_test::temporary_path();

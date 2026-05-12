@@ -31,6 +31,9 @@ pow_size(std::size_t base, std::size_t exponent)
  * A stencil stores linearized point indices and corresponding weights for one
  * interpolation point so that multiple fields on the same grid can reuse the
  * same lookup work.
+ *
+ * @tparam Dim Number of dimensions.
+ * @tparam PointsPerAxis Number of interpolation points along each axis.
  */
 template<std::size_t Dim, std::size_t PointsPerAxis>
 class TensorStencil
@@ -107,6 +110,12 @@ using CubicStencil = TensorStencil<Dim, 4>;
 
 /**
  * @brief N-dimensional grid metadata with stride and query preparation logic.
+
+ * A grid is defined by one axis descriptor per dimension. It provides the
+ * logic to prepare interpolation stencils for query points and to validate
+ * compatibility with field groups.
+ *
+ * @tparam Dim Number of dimensions.
  */
 template<std::size_t Dim>
 class Grid

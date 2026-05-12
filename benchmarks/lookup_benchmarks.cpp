@@ -50,13 +50,13 @@ template<std::size_t Dim>
 struct LookupContext
 {
   ndtbl::Grid<Dim> grid;
-  ndtbl::FieldGroup<double, Dim> group;
+  ndtbl::FieldGroup<Dim, double> group;
   ndtbl::RuntimeFieldGroup<Dim> runtime_group;
   std::vector<std::array<double, Dim>> queries;
   ndtbl::LinearStencil<Dim> prepared;
 
   LookupContext(const ndtbl::Grid<Dim>& grid_in,
-                const ndtbl::FieldGroup<double, Dim>& group_in,
+                const ndtbl::FieldGroup<Dim, double>& group_in,
                 const std::vector<std::array<double, Dim>>& queries_in)
     : grid(grid_in)
     , group(group_in)
@@ -229,7 +229,7 @@ make_context(std::size_t extent,
   const std::array<std::size_t, Dim> shape = filled_shape<Dim>(extent);
   const std::array<ndtbl::Axis, Dim> axes = make_axes(shape, axis_kind);
   const ndtbl::Grid<Dim> grid(axes);
-  const ndtbl::FieldGroup<double, Dim> group(
+  const ndtbl::FieldGroup<Dim, double> group(
     grid, make_field_names<Dim>(field_count), make_payload(grid, field_count));
   return LookupContext<Dim>(grid, group, make_queries(axes, query_count));
 }
