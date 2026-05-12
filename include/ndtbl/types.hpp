@@ -10,7 +10,9 @@ namespace ndtbl {
  */
 enum class axis_kind : std::uint8_t
 {
+  /// Axis coordinates are generated from minimum, maximum, and size.
   uniform = 1,
+  /// Axis coordinates are stored explicitly in ascending order.
   explicit_coordinates = 2
 };
 
@@ -19,7 +21,9 @@ enum class axis_kind : std::uint8_t
  */
 enum class scalar_type : std::uint8_t
 {
+  /// IEEE-754 single-precision floating-point payload values.
   float32 = 1,
+  /// IEEE-754 double-precision floating-point payload values.
   float64 = 2
 };
 
@@ -28,7 +32,9 @@ enum class scalar_type : std::uint8_t
  */
 enum class bounds_policy : std::uint8_t
 {
+  /// Clamp out-of-domain interpolation queries to the table bounds.
   clamp = 1,
+  /// Reject out-of-domain interpolation queries with an exception.
   throw_error = 2
 };
 

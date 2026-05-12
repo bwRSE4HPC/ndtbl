@@ -21,6 +21,9 @@ namespace ndtbl {
 class Axis
 {
 public:
+  /**
+   * @brief Construct a single-point uniform axis at coordinate zero.
+   */
   Axis()
     : kind_(axis_kind::uniform)
     , size_(1)
