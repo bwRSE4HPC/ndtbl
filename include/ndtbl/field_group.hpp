@@ -12,6 +12,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -153,8 +154,27 @@ public:
   template<class Stencil>
   std::vector<Stored> evaluate_all(const Stencil& stencil) const
   {
-    std::vector<Stored> results(field_count(), Stored(0));
-    evaluate_all_into(stencil, results.data());
+    return evaluate_all_as<Stored>(stencil);
+  }
+
+  /**
+   * @brief Evaluate all fields using a previously prepared interpolation
+   * stencil and caller-selected output precision.
+   *
+   * @tparam Output Floating-point type produced by interpolation.
+   * @tparam Stencil Fixed-size interpolation stencil type.
+   * @param stencil Prepared stencil to reuse across fields.
+   * @return Interpolated field values in storage order.
+   * @see evaluate_all(const Stencil&)
+   */
+  template<class Output, class Stencil>
+  std::vector<Output> evaluate_all_as(const Stencil& stencil) const
+  {
+    static_assert(std::is_floating_point<Output>::value,
+                  "FieldGroup output type must be floating point");
+
+    std::vector<Output> results(field_count(), Output(0));
+    evaluate_all_into_as<Output>(stencil, results.data());
     return results;
   }
 
@@ -170,10 +190,29 @@ public:
   template<class Stencil>
   void evaluate_all_into(const Stencil& stencil, Stored* results) const
   {
+    evaluate_all_into_as(stencil, results);
+  }
+
+  /**
+   * @brief Evaluate all fields using a previously prepared interpolation
+   * stencil into caller-provided storage with caller-selected output precision.
+   *
+   * @tparam Output Floating-point type produced by interpolation.
+   * @tparam Stencil Fixed-size interpolation stencil type.
+   * @param stencil Prepared stencil to reuse across fields.
+   * @param results Output buffer with space for `field_count()` values.
+   * @see evaluate_all_into(const Stencil&, Stored*)
+   */
+  template<class Output, class Stencil>
+  void evaluate_all_into_as(const Stencil& stencil, Output* results) const
+  {
+    static_assert(std::is_floating_point<Output>::value,
+                  "FieldGroup output type must be floating point");
+
     const std::size_t fields = field_count();
     const Stored* const typed_values = interleaved_values_.typed_data();
 
-    std::fill(results, results + fields, Stored(0));
+    std::fill(results, results + fields, Output(0));
     if (typed_values != nullptr) {
       evaluate_all_into_typed(stencil, typed_values, fields, results);
       return;
@@ -195,7 +234,25 @@ public:
     const std::array<double, Dim>& coordinates,
     bounds_policy policy = bounds_policy::clamp) const
   {
-    return evaluate_all(grid_.prepare_linear(coordinates, policy));
+    return evaluate_all_linear_as<Stored>(coordinates, policy);
+  }
+
+  /**
+   * @brief Evaluate all fields directly from query coordinates using
+   * multilinear interpolation and caller-selected output precision.
+   *
+   * @tparam Output Floating-point type produced by interpolation.
+   * @param coordinates Query coordinates in grid axis order.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
+   * @return Interpolated field values in storage order.
+   * @see evaluate_all_linear(const std::array<double, Dim>&, bounds_policy)
+   */
+  template<class Output>
+  std::vector<Output> evaluate_all_linear_as(
+    const std::array<double, Dim>& coordinates,
+    bounds_policy policy = bounds_policy::clamp) const
+  {
+    return evaluate_all_as<Output>(grid_.prepare_linear(coordinates, policy));
   }
 
   /**
@@ -212,7 +269,28 @@ public:
     Stored* results,
     bounds_policy policy = bounds_policy::clamp) const
   {
-    evaluate_all_into(grid_.prepare_linear(coordinates, policy), results);
+    evaluate_all_linear_into_as(coordinates, results, policy);
+  }
+
+  /**
+   * @brief Evaluate all fields directly from query coordinates using
+   * multilinear interpolation into caller-provided storage with
+   * caller-selected output precision.
+   *
+   * @tparam Output Floating-point type produced by interpolation.
+   * @param coordinates Query coordinates in grid axis order.
+   * @param results Output buffer with space for `field_count()` values.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
+   * @see evaluate_all_linear_into(const std::array<double, Dim>&, Stored*,
+   *                               bounds_policy)
+   */
+  template<class Output>
+  void evaluate_all_linear_into_as(
+    const std::array<double, Dim>& coordinates,
+    Output* results,
+    bounds_policy policy = bounds_policy::clamp) const
+  {
+    evaluate_all_into_as(grid_.prepare_linear(coordinates, policy), results);
   }
 
   /**
@@ -232,7 +310,25 @@ public:
     const std::array<double, Dim>& coordinates,
     bounds_policy policy = bounds_policy::clamp) const
   {
-    return evaluate_all(grid_.prepare_cubic(coordinates, policy));
+    return evaluate_all_cubic_as<Stored>(coordinates, policy);
+  }
+
+  /**
+   * @brief Evaluate all fields directly from query coordinates using local
+   * cubic interpolation and caller-selected output precision.
+   *
+   * @tparam Output Floating-point type produced by interpolation.
+   * @param coordinates Query coordinates in grid axis order.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
+   * @return Cubically interpolated field values in storage order.
+   * @see evaluate_all_cubic(const std::array<double, Dim>&, bounds_policy)
+   */
+  template<class Output>
+  std::vector<Output> evaluate_all_cubic_as(
+    const std::array<double, Dim>& coordinates,
+    bounds_policy policy = bounds_policy::clamp) const
+  {
+    return evaluate_all_as<Output>(grid_.prepare_cubic(coordinates, policy));
   }
 
   /**
@@ -249,37 +345,58 @@ public:
     Stored* results,
     bounds_policy policy = bounds_policy::clamp) const
   {
-    evaluate_all_into(grid_.prepare_cubic(coordinates, policy), results);
+    evaluate_all_cubic_into_as(coordinates, results, policy);
+  }
+
+  /**
+   * @brief Evaluate all fields directly from query coordinates using local
+   * cubic interpolation into caller-provided storage with caller-selected
+   * output precision.
+   *
+   * @tparam Output Floating-point type produced by interpolation.
+   * @param coordinates Query coordinates in grid axis order.
+   * @param results Output buffer with space for `field_count()` values.
+   * @param policy Bounds handling behavior for out-of-domain coordinates.
+   * @see evaluate_all_cubic_into(const std::array<double, Dim>&, Stored*,
+   *                              bounds_policy)
+   */
+  template<class Output>
+  void evaluate_all_cubic_into_as(
+    const std::array<double, Dim>& coordinates,
+    Output* results,
+    bounds_policy policy = bounds_policy::clamp) const
+  {
+    evaluate_all_into_as(grid_.prepare_cubic(coordinates, policy), results);
   }
 
 private:
-  template<class Stencil>
+  template<class Stencil, class Output>
   void evaluate_all_into_typed(const Stencil& stencil,
                                const Stored* values,
                                std::size_t fields,
-                               Stored* results) const
+                               Output* results) const
   {
     for (std::size_t point = 0; point < Stencil::points; ++point) {
-      const double weight = stencil.weight(point);
+      const Output weight = static_cast<Output>(stencil.weight(point));
       const std::size_t base = stencil.point_index(point) * fields;
       for (std::size_t field = 0; field < fields; ++field) {
         const Stored value = values[base + field];
-        results[field] += static_cast<Stored>(weight * value);
+        results[field] += weight * static_cast<Output>(value);
       }
     }
   }
 
-  template<class Stencil>
+  template<class Stencil, class Output>
   void evaluate_all_into_bytes(const Stencil& stencil,
                                std::size_t fields,
-                               Stored* results) const
+                               Output* results) const
   {
     for (std::size_t point = 0; point < Stencil::points; ++point) {
-      const double weight = stencil.weight(point);
+      const Output weight = static_cast<Output>(stencil.weight(point));
       const std::size_t base = stencil.point_index(point) * fields;
       for (std::size_t field = 0; field < fields; ++field) {
         const Stored value = interleaved_values_.unchecked(base + field);
-        results[field] += static_cast<Stored>(weight * value);
+        results[field] += weight * static_cast<Output>(value);
       }
     }
   }

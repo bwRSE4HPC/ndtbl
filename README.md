@@ -67,10 +67,11 @@ Relevant CMake options:
 - `ndtbl_BUILD_DOCS`: build the documentation, default `ON` for top-level builds
 - `ndtbl_ENABLE_MMAP`: enable POSIX-only `mmap`-backed payload reads, default `OFF`
 
-When `ndtbl_ENABLE_MMAP=OFF` (the default), `read_group()` reads payload data
-into owned heap storage. When `ndtbl_ENABLE_MMAP=ON`, supported POSIX builds
-use read-only memory mapping instead, which can reduce heap usage for large
-tables and enables shared memory access in multi-process environments.
+When `ndtbl_ENABLE_MMAP=OFF` (the default), `read_field_group()` and
+`read_runtime_field_group()` read payload data into owned heap storage. When
+`ndtbl_ENABLE_MMAP=ON`, supported POSIX builds use read-only memory mapping
+instead, which can reduce heap usage for large tables and enables shared memory
+access in multi-process environments.
 
 If you want to install the C++ headers and CMake package metadata:
 

@@ -129,7 +129,8 @@ write_group(const std::string& path,
  *
  * @param path Input file path.
  * @return Parsed metadata describing the stored group.
- * @see read_group
+ * @see read_field_group
+ * @see read_runtime_field_group
  */
 inline GroupMetadata
 read_group_metadata(const std::string& path)
@@ -143,21 +144,75 @@ read_group_metadata(const std::string& path)
 }
 
 /**
+ * @brief Read an ndtbl file into a typed field group.
+ *
+ * The file dimension and scalar payload type must match the compile-time
+ * `Dim` and `Stored` arguments.
+ *
+ * @tparam Dim Expected grid dimensionality of the file.
+ * @tparam Stored Expected scalar payload type stored in the file.
+ * @param path Input file path.
+ * @return Typed field group with payload storage of type `Stored`.
+ * @see read_group_metadata
+ * @see FieldGroup
+ */
+template<std::size_t Dim, class Stored>
+inline FieldGroup<Dim, Stored>
+read_field_group(const std::string& path)
+{
+  std::ifstream is(path.c_str(), std::ios::binary);
+  if (!is.is_open()) {
+    throw std::runtime_error("failed to open ndtbl input file: " + path);
+  }
+
+  const detail::parsed_group_layout layout = detail::read_group_layout_impl(is);
+  const GroupMetadata& metadata = layout.metadata;
+  if (metadata.dimension != Dim) {
+    throw std::runtime_error(
+      "ndtbl file dimension does not match typed loader");
+  }
+  if (metadata.value_type != scalar_type_of<Stored>()) {
+    throw std::runtime_error(
+      "ndtbl file scalar type does not match typed loader");
+  }
+
+  const std::array<Axis, Dim> axes = detail::fixed_axes<Dim>(metadata.axes);
+  const Grid<Dim> grid(axes);
+#if NDTBL_ENABLE_MMAP
+  const std::shared_ptr<const std::uint8_t> payload_owner =
+    detail::map_payload_bytes(path, layout.payload_offset, layout.payload_size);
+  return FieldGroup<Dim, Stored>(
+    grid,
+    metadata.field_names,
+    PayloadView<Stored>(payload_owner.get(), layout.value_count),
+    payload_owner);
+#else
+  // Keep this non-const so the payload buffer can be moved into the read-only
+  // FieldGroup storage instead of copied during load.
+  std::vector<Stored> values =
+    detail::read_payload<Stored>(is, layout.value_count);
+  return FieldGroup<Dim, Stored>(grid, metadata.field_names, std::move(values));
+#endif
+}
+
+/**
  * @brief Read an ndtbl file into a runtime-erased field group.
  *
- * The file dimension must match the compile-time `Dim` argument.
+ * The file dimension must match the compile-time `Dim` argument. The scalar
+ * payload type is selected from file metadata at runtime.
  *
  * @tparam Dim Expected grid dimensionality of the file.
  * @tparam Output Output type used by runtime-erased interpolation.
  * @param path Input file path.
  * @return Runtime-erased field group with either float or double payload
  *         storage and `Output` interpolation results.
+ * @see read_field_group
  * @see read_group_metadata
  * @see RuntimeFieldGroup
  */
 template<std::size_t Dim, class Output = double>
 inline RuntimeFieldGroup<Dim, Output>
-read_group(const std::string& path)
+read_runtime_field_group(const std::string& path)
 {
   std::ifstream is(path.c_str(), std::ios::binary);
   if (!is.is_open()) {

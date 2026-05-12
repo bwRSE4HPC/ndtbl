@@ -266,22 +266,16 @@ private:
                                   Output* values,
                                   bounds_policy policy) const override
     {
-      evaluate_all_linear_into_impl(
-        coordinates,
-        values,
-        policy,
-        typename std::is_same<Stored, Output>::type());
+      group_.template evaluate_all_linear_into_as<Output>(
+        coordinates, values, policy);
     }
 
     void evaluate_all_cubic_into(const std::array<double, Dim>& coordinates,
                                  Output* values,
                                  bounds_policy policy) const override
     {
-      evaluate_all_cubic_into_impl(
-        coordinates,
-        values,
-        policy,
-        typename std::is_same<Stored, Output>::type());
+      group_.template evaluate_all_cubic_into_as<Output>(
+        coordinates, values, policy);
     }
 
     void write(std::ostream& os) const override
@@ -290,72 +284,6 @@ private:
     }
 
     FieldGroup<Dim, Stored> group_;
-
-  private:
-    void evaluate_all_linear_into_impl(
-      const std::array<double, Dim>& coordinates,
-      Output* values,
-      bounds_policy policy,
-      std::true_type) const
-    {
-      group_.evaluate_all_linear_into(coordinates, values, policy);
-    }
-
-    void evaluate_all_linear_into_impl(
-      const std::array<double, Dim>& coordinates,
-      Output* values,
-      bounds_policy policy,
-      std::false_type) const
-    {
-      std::vector<Stored>& scratch = thread_scratch();
-      const std::size_t count = group_.field_count();
-      if (scratch.size() < count) {
-        scratch.resize(count);
-      }
-
-      group_.evaluate_all_linear_into(coordinates, scratch.data(), policy);
-      copy_scratch_to_output(scratch, count, values);
-    }
-
-    void evaluate_all_cubic_into_impl(
-      const std::array<double, Dim>& coordinates,
-      Output* values,
-      bounds_policy policy,
-      std::true_type) const
-    {
-      group_.evaluate_all_cubic_into(coordinates, values, policy);
-    }
-
-    void evaluate_all_cubic_into_impl(
-      const std::array<double, Dim>& coordinates,
-      Output* values,
-      bounds_policy policy,
-      std::false_type) const
-    {
-      std::vector<Stored>& scratch = thread_scratch();
-      const std::size_t count = group_.field_count();
-      if (scratch.size() < count) {
-        scratch.resize(count);
-      }
-
-      group_.evaluate_all_cubic_into(coordinates, scratch.data(), policy);
-      copy_scratch_to_output(scratch, count, values);
-    }
-
-    static std::vector<Stored>& thread_scratch()
-    {
-      static thread_local std::vector<Stored> scratch;
-      return scratch;
-    }
-
-    static void copy_scratch_to_output(const std::vector<Stored>& scratch,
-                                       std::size_t count,
-                                       Output* values)
-    {
-      for (std::size_t field = 0; field < count; ++field) {
-        values[field] = static_cast<Output>(scratch[field]);
-      }
-    }
   };
 
   std::shared_ptr<const Concept> impl_;

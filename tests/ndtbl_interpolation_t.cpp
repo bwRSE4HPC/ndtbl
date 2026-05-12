@@ -117,7 +117,8 @@ require_loaded_linear_recovery(const std::array<ndtbl::Axis, Dim>& axes,
   const std::string path = ndtbl_test::temporary_path();
   ndtbl::write_group(path, group);
 
-  const ndtbl::RuntimeFieldGroup<Dim> loaded = ndtbl::read_group<Dim>(path);
+  const ndtbl::RuntimeFieldGroup<Dim> loaded =
+    ndtbl::read_runtime_field_group<Dim>(path);
   std::array<double, 2> values = { 0.0, 0.0 };
   loaded.evaluate_all_linear_into(query, values.data());
 
@@ -239,6 +240,24 @@ TEST_CASE("field group evaluates unaligned byte-backed payloads",
   group.evaluate_all_linear_into({ 0.25 }, values.data());
 
   REQUIRE(values[0] == Catch::Approx(1.5));
+}
+
+TEST_CASE("field group evaluates float payloads into double output",
+          "[field_group][interpolation]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<1, float> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 16777216.0f, 16777218.0f });
+
+  const std::vector<double> values =
+    group.evaluate_all_linear_as<double>({ 0.5 });
+  std::array<double, 1> into_values = { 0.0 };
+  group.evaluate_all_linear_into_as({ 0.5 }, into_values.data());
+
+  REQUIRE(values[0] == Catch::Approx(16777217.0));
+  REQUIRE(into_values[0] == Catch::Approx(16777217.0));
 }
 
 TEST_CASE("field group exactly recovers linear fields on uniform axes in 2D",
@@ -425,7 +444,8 @@ TEST_CASE("runtime field group forwards throw bounds policy",
   const std::string path = ndtbl_test::temporary_path();
   ndtbl::write_group(path, group);
 
-  const ndtbl::RuntimeFieldGroup<2> loaded = ndtbl::read_group<2>(path);
+  const ndtbl::RuntimeFieldGroup<2> loaded =
+    ndtbl::read_runtime_field_group<2>(path);
   std::array<double, 2> values = { 0.0, 0.0 };
   REQUIRE_NOTHROW(
     loaded.evaluate_all_linear_into({ -2.0, 7.0 }, values.data()));
@@ -482,6 +502,26 @@ TEST_CASE("field group cubic interpolation exactly recovers 1D cubic data",
   REQUIRE(prepared_values[0] == Catch::Approx(cubic_1d(0.4)));
   REQUIRE(direct_values[0] == Catch::Approx(cubic_1d(0.4)));
   REQUIRE(into_values[0] == Catch::Approx(cubic_1d(0.4)));
+}
+
+TEST_CASE("field group cubic interpolation supports double output from floats",
+          "[field_group][interpolation][cubic]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 3.0, 4),
+  };
+  const ndtbl::FieldGroup<1, float> group(
+    ndtbl::Grid<1>(axes),
+    { "linear" },
+    { 16777216.0f, 16777218.0f, 16777220.0f, 16777222.0f });
+
+  const std::vector<double> values =
+    group.evaluate_all_cubic_as<double>({ 0.5 });
+  std::array<double, 1> into_values = { 0.0 };
+  group.evaluate_all_cubic_into_as({ 0.5 }, into_values.data());
+
+  REQUIRE(values[0] == Catch::Approx(16777217.0));
+  REQUIRE(into_values[0] == Catch::Approx(16777217.0));
 }
 
 TEST_CASE("field group cubic interpolation exactly recovers explicit-axis data",
@@ -577,7 +617,8 @@ TEST_CASE("runtime field groups expose explicit cubic interpolation",
   const std::string path = ndtbl_test::temporary_path();
   ndtbl::write_group(path, group);
 
-  const ndtbl::RuntimeFieldGroup<1> loaded = ndtbl::read_group<1>(path);
+  const ndtbl::RuntimeFieldGroup<1> loaded =
+    ndtbl::read_runtime_field_group<1>(path);
   const std::vector<double> values = loaded.evaluate_all_cubic({ 0.4 });
 
   REQUIRE(values[0] == Catch::Approx(cubic_1d(0.4)));
