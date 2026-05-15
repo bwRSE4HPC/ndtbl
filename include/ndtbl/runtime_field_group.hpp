@@ -9,23 +9,30 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace ndtbl {
 
-template<class Value, std::size_t Dim>
+template<class Stored, std::size_t Dim>
 void
-write_group_stream(std::ostream& os, const FieldGroup<Value, Dim>& group);
+write_group_stream(std::ostream& os, const FieldGroup<Dim, Stored>& group);
 
 /**
- * @brief Runtime-erased wrapper around a typed `FieldGroup<Value, Dim>`.
+ * @brief Runtime-erased wrapper around a typed `FieldGroup<Dim, Stored>`.
  *
  * The dimensionality remains part of the type. Only the stored scalar payload
  * type is selected from file metadata at runtime.
+ *
+ * @tparam Dim Grid dimensionality of the group.
+ * @tparam Output Floating-point type produced by interpolation calls.
  */
-template<std::size_t Dim>
+template<std::size_t Dim, class Output = double>
 class RuntimeFieldGroup
 {
+  static_assert(std::is_floating_point<Output>::value,
+                "RuntimeFieldGroup output type must be floating point");
+
 public:
   /**
    * @brief Construct an empty runtime-erased group handle.
@@ -35,13 +42,13 @@ public:
   /**
    * @brief Construct a runtime-erased wrapper from a typed field group.
    *
-   * @tparam Value Scalar payload type stored in the source group.
+   * @tparam Stored Scalar payload type stored in the source group.
    * @param group Typed field group to wrap.
    * @see FieldGroup
    */
-  template<class Value>
-  explicit RuntimeFieldGroup(const FieldGroup<Value, Dim>& group)
-    : impl_(std::make_shared<Model<Value>>(group))
+  template<class Stored>
+  explicit RuntimeFieldGroup(const FieldGroup<Dim, Stored>& group)
+    : impl_(std::make_shared<Model<Stored>>(group))
   {
   }
 
@@ -124,14 +131,14 @@ public:
    *
    * @param coordinates Query coordinates in grid axis order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
-   * @return Interpolated field values converted to `double`.
+   * @return Interpolated field values converted to `Output`.
    * @see evaluate_all_linear_into
    */
-  std::vector<double> evaluate_all_linear(
+  std::vector<Output> evaluate_all_linear(
     const std::array<double, Dim>& coordinates,
     bounds_policy policy = bounds_policy::clamp) const
   {
-    std::vector<double> values(field_count(), 0.0);
+    std::vector<Output> values(field_count(), Output(0));
     evaluate_all_linear_into(coordinates, values.data(), policy);
     return values;
   }
@@ -147,7 +154,7 @@ public:
    */
   void evaluate_all_linear_into(
     const std::array<double, Dim>& coordinates,
-    double* values,
+    Output* values,
     bounds_policy policy = bounds_policy::clamp) const
   {
     if (!impl_) {
@@ -165,14 +172,14 @@ public:
    *
    * @param coordinates Query coordinates in grid axis order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
-   * @return Cubically interpolated field values converted to `double`.
+   * @return Cubically interpolated field values converted to `Output`.
    * @see evaluate_all_cubic_into
    */
-  std::vector<double> evaluate_all_cubic(
+  std::vector<Output> evaluate_all_cubic(
     const std::array<double, Dim>& coordinates,
     bounds_policy policy = bounds_policy::clamp) const
   {
-    std::vector<double> values(field_count(), 0.0);
+    std::vector<Output> values(field_count(), Output(0));
     evaluate_all_cubic_into(coordinates, values.data(), policy);
     return values;
   }
@@ -188,7 +195,7 @@ public:
    */
   void evaluate_all_cubic_into(
     const std::array<double, Dim>& coordinates,
-    double* values,
+    Output* values,
     bounds_policy policy = bounds_policy::clamp) const
   {
     if (!impl_) {
@@ -222,27 +229,26 @@ private:
     virtual std::size_t field_index(const std::string& field_name) const = 0;
     virtual void evaluate_all_linear_into(
       const std::array<double, Dim>& coordinates,
-      double* values,
+      Output* values,
       bounds_policy policy) const = 0;
     virtual void evaluate_all_cubic_into(
       const std::array<double, Dim>& coordinates,
-      double* values,
+      Output* values,
       bounds_policy policy) const = 0;
     virtual void write(std::ostream& os) const = 0;
   };
 
-  template<class Value>
+  template<class Stored>
   struct Model : Concept
   {
-    explicit Model(const FieldGroup<Value, Dim>& group)
+    explicit Model(const FieldGroup<Dim, Stored>& group)
       : group_(group)
-      , scratch_(group.field_count(), Value(0))
     {
     }
 
     std::size_t field_count() const override { return group_.field_count(); }
 
-    scalar_type value_type() const override { return scalar_type_of<Value>(); }
+    scalar_type value_type() const override { return scalar_type_of<Stored>(); }
 
     std::vector<std::string> field_names() const override
     {
@@ -257,23 +263,19 @@ private:
     }
 
     void evaluate_all_linear_into(const std::array<double, Dim>& coordinates,
-                                  double* values,
+                                  Output* values,
                                   bounds_policy policy) const override
     {
-      group_.evaluate_all_linear_into(coordinates, scratch_.data(), policy);
-      for (std::size_t field = 0; field < scratch_.size(); ++field) {
-        values[field] = static_cast<double>(scratch_[field]);
-      }
+      group_.template evaluate_all_linear_into_as<Output>(
+        coordinates, values, policy);
     }
 
     void evaluate_all_cubic_into(const std::array<double, Dim>& coordinates,
-                                 double* values,
+                                 Output* values,
                                  bounds_policy policy) const override
     {
-      group_.evaluate_all_cubic_into(coordinates, scratch_.data(), policy);
-      for (std::size_t field = 0; field < scratch_.size(); ++field) {
-        values[field] = static_cast<double>(scratch_[field]);
-      }
+      group_.template evaluate_all_cubic_into_as<Output>(
+        coordinates, values, policy);
     }
 
     void write(std::ostream& os) const override
@@ -281,8 +283,7 @@ private:
       write_group_stream(os, group_);
     }
 
-    FieldGroup<Value, Dim> group_;
-    mutable std::vector<Value> scratch_;
+    FieldGroup<Dim, Stored> group_;
   };
 
   std::shared_ptr<const Concept> impl_;

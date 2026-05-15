@@ -31,7 +31,7 @@ struct GroupMetadata
   /// Field names in payload storage order.
   std::vector<std::string> field_names;
   /// ndtbl binary file format version.
-  std::uint8_t format_version = 1u;
+  std::uint8_t format_version = current_format_version;
 };
 
 } // namespace ndtbl

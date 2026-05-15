@@ -39,6 +39,7 @@ target_sources(ndtbl
       include/ndtbl/payload.hpp
       include/ndtbl/io.hpp
       include/ndtbl/ndtbl.hpp
+      include/ndtbl/detail/size_math.hpp
       include/ndtbl/detail/binary_io.hpp
       include/ndtbl/detail/mapped_payload.hpp
 )

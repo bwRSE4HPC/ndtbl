@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ndtbl/axis.hpp"
+#include "ndtbl/detail/size_math.hpp"
 
 #include <algorithm>
 #include <array>
@@ -12,6 +13,16 @@ namespace ndtbl {
 
 namespace detail {
 
+/**
+ * @brief Compute an integer power for `std::size_t` values.
+ *
+ * Computes `base` raised to the power `exponent` by repeated multiplication.
+ * Intended for small compile-time constants such as stencil sizes.
+ *
+ * @param base Base value.
+ * @param exponent Non-negative exponent.
+ * @return `base` raised to `exponent`.
+ */
 constexpr std::size_t
 pow_size(std::size_t base, std::size_t exponent)
 {
@@ -30,10 +41,18 @@ pow_size(std::size_t base, std::size_t exponent)
  * A stencil stores linearized point indices and corresponding weights for one
  * interpolation point so that multiple fields on the same grid can reuse the
  * same lookup work.
+ *
+ * @tparam Dim Number of dimensions.
+ * @tparam PointsPerAxis Number of interpolation points along each axis.
  */
 template<std::size_t Dim, std::size_t PointsPerAxis>
 class TensorStencil
 {
+  static_assert(Dim > 0, "ndtbl grids must have at least one dimension");
+  static_assert(
+    PointsPerAxis > 0,
+    "ndtbl tensor stencils must contain at least one point per axis");
+
 public:
   /// Number of dimensions.
   static constexpr std::size_t dimensions = Dim;
@@ -93,22 +112,36 @@ template<std::size_t Dim>
 using LinearStencil = TensorStencil<Dim, 2>;
 
 /**
- * @brief Local tensor-product cubic interpolation stencil with four points per
- * axis.
+ * @brief Local tensor-product cubic Lagrange interpolation stencil with four
+ * points per axis.
  */
 template<std::size_t Dim>
 using CubicStencil = TensorStencil<Dim, 4>;
 
 /**
  * @brief N-dimensional grid metadata with stride and query preparation logic.
+
+ * A grid is defined by one axis descriptor per dimension. It provides the
+ * logic to prepare interpolation stencils for query points and to validate
+ * compatibility with field groups.
+ *
+ * @tparam Dim Number of dimensions.
  */
 template<std::size_t Dim>
 class Grid
 {
+  static_assert(Dim > 0, "ndtbl grids must have at least one dimension");
+
 public:
   /// Number of dimensions.
   static constexpr std::size_t dimensions = Dim;
 
+  /**
+   * @brief Construct an empty grid descriptor.
+   *
+   * The default-constructed grid has zero points and is mainly useful as a
+   * placeholder before assigning a fully constructed grid.
+   */
   Grid()
   {
     point_count_ = 0;
@@ -128,9 +161,11 @@ public:
     strides_[Dim - 1] = 1;
     for (std::size_t axis = Dim; axis-- > 0;) {
       extents_[axis] = axes_[axis].size();
-      point_count_ *= extents_[axis];
+      point_count_ = detail::checked_multiply_size(
+        point_count_, extents_[axis], "point count");
       if (axis + 1 < Dim) {
-        strides_[axis] = strides_[axis + 1] * extents_[axis + 1];
+        strides_[axis] = detail::checked_multiply_size(
+          strides_[axis + 1], extents_[axis + 1], "grid stride");
       }
     }
   }
@@ -253,16 +288,34 @@ public:
   }
 
   /**
-   * @brief Precompute a local tensor-product cubic interpolation stencil for
-   * one query point.
+   * @brief Precompute a local tensor-product cubic Lagrange interpolation
+   * stencil for one query point.
    *
-   * Cubic interpolation uses four support points per axis and therefore `4^Dim`
-   * table values. It is intended as an experimental higher-order path. The
-   * linear path remains the default.
+   * This method builds a local interpolation stencil using four support points
+   * per axis. Along each axis, the one-dimensional weights are the cubic
+   * Lagrange basis weights for the selected four axis coordinates:
+   *
+   *   L_i(x) = prod_{j != i} (x - x_j) / (x_i - x_j)
+   *
+   * The multidimensional stencil is formed as the tensor product of these
+   * one-dimensional Lagrange weights. Consequently, the stencil contains
+   * `4^Dim` table values.
+   *
+   * The basis weights are computed from the actual axis coordinates, so
+   * non-uniform axes are supported. Near domain boundaries, the four-point
+   * support window is shifted/clamped so that it remains inside the table. This
+   * makes the cubic stencil one-sided near boundaries.
+   *
+   * Cubic interpolation is intended as an experimental higher-order path. The
+   * linear path remains the recommended default for performance-critical
+   * high-dimensional table lookup.
    *
    * @param coordinates Query coordinates in axis order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
-   * @return Cubic stencil containing point indices and weights.
+   * @return Cubic stencil containing flattened table point indices and
+   * tensor-product weights.
+   *
+   * @throws std::invalid_argument if any axis contains fewer than four points.
    */
   CubicStencil<Dim> prepare_cubic(
     const std::array<double, Dim>& coordinates,
@@ -314,6 +367,23 @@ public:
   }
 
 private:
+  /**
+   * @brief Compute one-dimensional cubic Lagrange basis weights for one axis.
+   *
+   * Given four support point indices on the selected axis and a query
+   * coordinate, this function computes the four Lagrange basis weights
+   *
+   *   w_i = prod_{j != i} (x - x_j) / (x_i - x_j)
+   *
+   * using the actual axis coordinates `x_i`. The resulting weights define the
+   * unique cubic polynomial, restricted to this local four-point stencil, that
+   * interpolates the four support values exactly.
+   *
+   * @param axis Axis for which the weights are computed.
+   * @param coordinate Query coordinate on that axis.
+   * @param indices Four support point indices on the selected axis.
+   * @param weights Output array receiving the four Lagrange basis weights.
+   */
   void cubic_weights(std::size_t axis,
                      double coordinate,
                      const std::array<std::size_t, 4>& indices,

@@ -35,3 +35,7 @@ API reference
 .. doxygenenum:: ndtbl::bounds_policy
 
 .. doxygenfunction:: ndtbl::read_group_metadata(const std::string &path)
+
+.. doxygenfunction:: ndtbl::read_field_group(const std::string &path)
+
+.. doxygenfunction:: ndtbl::read_runtime_field_group(const std::string &path)

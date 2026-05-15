@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ndtbl/detail/size_math.hpp"
 #include "ndtbl/field_group.hpp"
 #include "ndtbl/metadata.hpp"
 
@@ -25,7 +26,8 @@ namespace detail {
  * This constant is part of the binary file format implementation and is not
  * intended to be consumed directly by library users.
  */
-static const char file_magic[8] = { 'N', 'D', 'T', 'B', 'L', '\0', '\0', '\0' };
+static constexpr char file_magic[8] = { 'N', 'D',  'T',  'B',
+                                        'L', '\0', '\0', '\0' };
 
 /**
  * @brief Write one exact byte sequence to a binary stream.
@@ -132,10 +134,10 @@ read_float_le(std::istream& is)
   return value;
 }
 
-template<class Value>
+template<class Stored>
 struct payload_uint
 {
-  typedef typename std::conditional<sizeof(Value) == sizeof(std::uint32_t),
+  typedef typename std::conditional<sizeof(Stored) == sizeof(std::uint32_t),
                                     std::uint32_t,
                                     std::uint64_t>::type type;
 };
@@ -177,34 +179,6 @@ read_string(std::istream& is)
   return value;
 }
 
-inline std::size_t
-checked_multiply_size(std::size_t lhs, std::size_t rhs, const std::string& what)
-{
-  if (lhs != 0 && rhs > std::numeric_limits<std::size_t>::max() / lhs) {
-    throw std::runtime_error("ndtbl " + what + " exceeds supported size");
-  }
-  return lhs * rhs;
-}
-
-inline std::size_t
-checked_add_size(std::size_t lhs, std::size_t rhs, const std::string& what)
-{
-  if (rhs > std::numeric_limits<std::size_t>::max() - lhs) {
-    throw std::runtime_error("ndtbl " + what + " exceeds supported size");
-  }
-  return lhs + rhs;
-}
-
-inline std::size_t
-narrow_u64_to_size(std::uint64_t value, const std::string& what)
-{
-  if (value >
-      static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max())) {
-    throw std::runtime_error("ndtbl " + what + " exceeds supported size");
-  }
-  return static_cast<std::size_t>(value);
-}
-
 inline void
 require_zero(std::uint64_t value, const std::string& what)
 {
@@ -213,7 +187,7 @@ require_zero(std::uint64_t value, const std::string& what)
   }
 }
 
-inline std::size_t
+inline constexpr std::size_t
 fixed_header_size()
 {
   return sizeof(file_magic) + sizeof(std::uint8_t) + sizeof(std::uint8_t) +
@@ -251,19 +225,30 @@ metadata_size(const GroupMetadata& metadata)
   return total;
 }
 
+inline std::size_t
+axis_point_count(const std::vector<Axis>& axes)
+{
+  std::size_t point_count = 1;
+  for (std::size_t axis = 0; axis < axes.size(); ++axis) {
+    point_count =
+      checked_multiply_size(point_count, axes[axis].size(), "point count");
+  }
+  return point_count;
+}
+
 /**
  * @brief Internal implementation for writing raw metadata and payload data.
  *
- * @tparam Value Scalar payload type stored in the payload vector.
+ * @tparam Stored Scalar payload type stored in the payload vector.
  * @param os Destination stream in binary mode.
  * @param metadata File metadata describing the payload layout.
  * @param payload Point-major interleaved field payload.
  */
-template<class Value>
+template<class Stored>
 inline void
 write_group_stream_impl(std::ostream& os,
                         const GroupMetadata& metadata,
-                        const PayloadView<Value>& payload)
+                        const PayloadView<Stored>& payload)
 {
   if (metadata.axes.size() != metadata.dimension) {
     throw std::invalid_argument(
@@ -275,6 +260,16 @@ write_group_stream_impl(std::ostream& os,
       "ndtbl metadata field count does not match field names");
   }
 
+  if (metadata.value_type != scalar_type_of<Stored>()) {
+    throw std::invalid_argument(
+      "ndtbl metadata scalar type does not match payload type");
+  }
+
+  if (metadata.point_count != axis_point_count(metadata.axes)) {
+    throw std::invalid_argument(
+      "ndtbl point count does not match axis extents");
+  }
+
   const std::size_t expected_values = checked_multiply_size(
     metadata.point_count, metadata.field_count, "payload value count");
   if (payload.size() != expected_values) {
@@ -284,7 +279,7 @@ write_group_stream_impl(std::ostream& os,
   const std::size_t payload_offset = metadata_size(metadata);
 
   write_bytes(os, file_magic, sizeof(file_magic));
-  write_uint_le<std::uint8_t>(os, 1u);
+  write_uint_le<std::uint8_t>(os, current_format_version);
   write_uint_le<std::uint8_t>(os,
                               static_cast<std::uint8_t>(metadata.value_type));
   write_uint_le<std::uint16_t>(os, 0u);
@@ -326,8 +321,8 @@ write_group_stream_impl(std::ostream& os,
                   payload.byte_size());
     } else {
       for (std::size_t index = 0; index < payload.size(); ++index) {
-        write_float_le<Value, typename payload_uint<Value>::type>(
-          os, payload[index]);
+        write_float_le<Stored, typename payload_uint<Stored>::type>(
+          os, payload.unchecked(index));
       }
     }
   }
@@ -336,18 +331,18 @@ write_group_stream_impl(std::ostream& os,
 /**
  * @brief Internal implementation for writing a typed field group.
  *
- * @tparam Value Scalar payload type stored in the group.
+ * @tparam Stored Scalar payload type stored in the group.
  * @tparam Dim Grid dimensionality of the group.
  * @param os Destination stream in binary mode.
  * @param group Typed field group to serialize.
  * @see write_group_stream_impl(std::ostream&, const GroupMetadata&,
- *                              const std::vector<Value>&)
+ *                              const std::vector<Stored>&)
  */
-template<class Value, std::size_t Dim>
+template<class Stored, std::size_t Dim>
 inline void
-write_group_stream_impl(std::ostream& os, const FieldGroup<Value, Dim>& group)
+write_group_stream_impl(std::ostream& os, const FieldGroup<Dim, Stored>& group)
 {
-  GroupMetadata metadata = { scalar_type_of<Value>(),
+  GroupMetadata metadata = { scalar_type_of<Stored>(),
                              Dim,
                              group.field_count(),
                              group.point_count(),
@@ -357,11 +352,11 @@ write_group_stream_impl(std::ostream& os, const FieldGroup<Value, Dim>& group)
   write_group_stream_impl(os, metadata, group.interleaved_values());
 }
 
-template<class Value>
+template<class Stored>
 inline void
 write_group_stream_impl(std::ostream& os,
                         const GroupMetadata& metadata,
-                        const std::vector<Value>& payload)
+                        const std::vector<Stored>& payload)
 {
   write_group_stream_impl(os, metadata, payload_view(payload));
 }
@@ -381,7 +376,7 @@ verify_magic(std::istream& is)
   }
 }
 
-inline std::size_t
+inline constexpr std::size_t
 scalar_size(scalar_type type)
 {
   if (type == scalar_type::float32) {
@@ -413,7 +408,7 @@ read_group_layout_impl(std::istream& is)
   verify_magic(is);
 
   const std::uint8_t version = read_uint_le<std::uint8_t>(is);
-  if (version != 1u) {
+  if (version != current_format_version) {
     throw std::runtime_error("unsupported ndtbl version");
   }
 
@@ -461,12 +456,7 @@ read_group_layout_impl(std::istream& is)
     metadata.field_names.push_back(read_string(is));
   }
 
-  std::size_t expected_point_count = 1;
-  for (std::size_t axis = 0; axis < metadata.axes.size(); ++axis) {
-    expected_point_count = checked_multiply_size(
-      expected_point_count, metadata.axes[axis].size(), "point count");
-  }
-  if (expected_point_count != metadata.point_count) {
+  if (axis_point_count(metadata.axes) != metadata.point_count) {
     throw std::runtime_error("ndtbl point count does not match axis extents");
   }
 
@@ -499,16 +489,16 @@ read_group_metadata_impl(std::istream& is)
 /**
  * @brief Read a contiguous payload block from a binary stream.
  *
- * @tparam Value Scalar payload type to deserialize.
+ * @tparam Stored Scalar payload type to deserialize.
  * @param is Source stream positioned at the start of the payload.
  * @param value_count Number of scalar values to read.
  * @return Payload vector with `value_count` entries.
  */
-template<class Value>
-inline std::vector<Value>
+template<class Stored>
+inline std::vector<Stored>
 read_payload(std::istream& is, std::size_t value_count)
 {
-  std::vector<Value> values(value_count);
+  std::vector<Stored> values(value_count);
   if (value_count == 0) {
     return values;
   }
@@ -516,13 +506,13 @@ read_payload(std::istream& is, std::size_t value_count)
   if (host_is_little_endian()) {
     read_bytes(is,
                reinterpret_cast<char*>(values.data()),
-               values.size() * sizeof(Value));
+               values.size() * sizeof(Stored));
     return values;
   }
 
   for (std::size_t index = 0; index < value_count; ++index) {
     values[index] =
-      read_float_le<Value, typename payload_uint<Value>::type>(is);
+      read_float_le<Stored, typename payload_uint<Stored>::type>(is);
   }
   return values;
 }

@@ -6,7 +6,11 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <cstdint>
 #include <cstdio>
+#include <cstring>
+#include <limits>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -45,7 +49,7 @@ require_linear_recovery(const std::array<ndtbl::Axis, Dim>& axes,
   const double intercept0 = 1.25;
   const double intercept1 = -0.75;
 
-  const ndtbl::FieldGroup<double, Dim> group(
+  const ndtbl::FieldGroup<Dim, double> group(
     ndtbl::Grid<Dim>(axes),
     { "A", "B" },
     ndtbl_test::build_linear_payload(
@@ -79,7 +83,7 @@ require_clamped_linear_recovery(const std::array<ndtbl::Axis, Dim>& axes,
   const double intercept0 = 1.25;
   const double intercept1 = -0.75;
 
-  const ndtbl::FieldGroup<double, Dim> group(
+  const ndtbl::FieldGroup<Dim, double> group(
     ndtbl::Grid<Dim>(axes),
     { "A", "B" },
     ndtbl_test::build_linear_payload(
@@ -104,7 +108,7 @@ require_loaded_linear_recovery(const std::array<ndtbl::Axis, Dim>& axes,
   const double intercept0 = 1.25;
   const double intercept1 = -0.75;
 
-  const ndtbl::FieldGroup<double, Dim> group(
+  const ndtbl::FieldGroup<Dim, double> group(
     ndtbl::Grid<Dim>(axes),
     { "A", "B" },
     ndtbl_test::build_linear_payload(
@@ -113,7 +117,8 @@ require_loaded_linear_recovery(const std::array<ndtbl::Axis, Dim>& axes,
   const std::string path = ndtbl_test::temporary_path();
   ndtbl::write_group(path, group);
 
-  const ndtbl::RuntimeFieldGroup<Dim> loaded = ndtbl::read_group<Dim>(path);
+  const ndtbl::RuntimeFieldGroup<Dim> loaded =
+    ndtbl::read_runtime_field_group<Dim>(path);
   std::array<double, 2> values = { 0.0, 0.0 };
   loaded.evaluate_all_linear_into(query, values.data());
 
@@ -169,6 +174,91 @@ static_assert(ndtbl::LinearStencil<4>::points == 16,
               "4D linear interpolation should use 16 table points");
 static_assert(ndtbl::CubicStencil<4>::points == 256,
               "4D cubic interpolation should use 256 table points");
+
+TEST_CASE("grid rejects shape products exceeding supported size",
+          "[grid][validation]")
+{
+  const std::size_t huge_extent =
+    std::numeric_limits<std::size_t>::max() / 2u + 1u;
+  const std::array<ndtbl::Axis, 2> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+    ndtbl::Axis::uniform(0.0, 1.0, huge_extent),
+  };
+
+  REQUIRE_THROWS_AS(ndtbl::Grid<2>(axes), std::runtime_error);
+}
+
+TEST_CASE("field group rejects payload shape products exceeding supported size",
+          "[field_group][validation]")
+{
+  const std::size_t huge_extent =
+    std::numeric_limits<std::size_t>::max() / 2u + 1u;
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, huge_extent),
+  };
+  const ndtbl::Grid<1> grid(axes);
+
+  REQUIRE_THROWS_AS(
+    (ndtbl::FieldGroup<1, double>(grid, { "A", "B" }, std::vector<double>())),
+    std::runtime_error);
+}
+
+TEST_CASE("payload view keeps checked access separate from typed fast access",
+          "[payload]")
+{
+  const std::vector<double> payload = { 1.0, 2.0, 3.0 };
+  const ndtbl::PayloadView<double> view = ndtbl::payload_view(payload);
+
+  REQUIRE(view.typed_data() == payload.data());
+  REQUIRE(view.at(1) == Catch::Approx(2.0));
+  REQUIRE(view.unchecked(2) == Catch::Approx(3.0));
+  REQUIRE_THROWS_AS(view.at(payload.size()), std::out_of_range);
+}
+
+TEST_CASE("field group evaluates unaligned byte-backed payloads",
+          "[field_group][payload][interpolation]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const std::vector<double> payload = { 1.0, 3.0 };
+
+  std::shared_ptr<std::vector<std::uint8_t>> storage =
+    std::make_shared<std::vector<std::uint8_t>>(
+      payload.size() * sizeof(double) + 1u);
+  std::uint8_t* const unaligned_data = storage->data() + 1u;
+  std::memcpy(unaligned_data, payload.data(), payload.size() * sizeof(double));
+
+  const ndtbl::PayloadView<double> view(unaligned_data, payload.size());
+  REQUIRE(view.typed_data() == nullptr);
+
+  const std::shared_ptr<const std::uint8_t> owner(storage, unaligned_data);
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, view, owner);
+
+  std::array<double, 1> values = { 0.0 };
+  group.evaluate_all_linear_into({ 0.25 }, values.data());
+
+  REQUIRE(values[0] == Catch::Approx(1.5));
+}
+
+TEST_CASE("field group evaluates float payloads into double output",
+          "[field_group][interpolation]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<1, float> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 16777216.0f, 16777218.0f });
+
+  const std::vector<double> values =
+    group.evaluate_all_linear_as<double>({ 0.5 });
+  std::array<double, 1> into_values = { 0.0 };
+  group.evaluate_all_linear_into_as({ 0.5 }, into_values.data());
+
+  REQUIRE(values[0] == Catch::Approx(16777217.0));
+  REQUIRE(into_values[0] == Catch::Approx(16777217.0));
+}
 
 TEST_CASE("field group exactly recovers linear fields on uniform axes in 2D",
           "[field_group][interpolation]")
@@ -269,6 +359,26 @@ TEST_CASE("single-point axes reject out-of-domain coordinates in throw mode",
     std::out_of_range);
 }
 
+TEST_CASE("axes reject non-finite query coordinates", "[axis][interpolation]")
+{
+  const ndtbl::Axis uniform = ndtbl::Axis::uniform(0.0, 1.0, 3);
+  const ndtbl::Axis explicit_axis =
+    ndtbl::Axis::from_coordinates({ 0.0, 0.5, 1.0 });
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double infinity = std::numeric_limits<double>::infinity();
+
+  REQUIRE_THROWS_AS(uniform.bracket(nan), std::out_of_range);
+  REQUIRE_THROWS_AS(uniform.bracket(nan, ndtbl::bounds_policy::throw_error),
+                    std::out_of_range);
+  REQUIRE_THROWS_AS(explicit_axis.bracket(nan), std::out_of_range);
+  REQUIRE_THROWS_AS(
+    explicit_axis.bracket(nan, ndtbl::bounds_policy::throw_error),
+    std::out_of_range);
+
+  REQUIRE_THROWS_AS(uniform.bracket(infinity), std::out_of_range);
+  REQUIRE_THROWS_AS(explicit_axis.bracket(-infinity), std::out_of_range);
+}
+
 TEST_CASE("field group rejects uniform-axis queries outside the domain",
           "[field_group][interpolation]")
 {
@@ -276,7 +386,7 @@ TEST_CASE("field group rejects uniform-axis queries outside the domain",
     ndtbl::Axis::uniform(-1.0, 2.0, 4),
     ndtbl::Axis::uniform(0.0, 6.0, 4),
   };
-  const ndtbl::FieldGroup<double, 2> group(
+  const ndtbl::FieldGroup<2, double> group(
     ndtbl::Grid<2>(axes),
     { "A", "B" },
     ndtbl_test::build_linear_payload(
@@ -301,7 +411,7 @@ TEST_CASE("field group rejects explicit-axis queries outside the domain",
     ndtbl::Axis::from_coordinates({ -2.0, -0.5, 1.0, 3.5 }),
     ndtbl::Axis::from_coordinates({ 1.0, 1.75, 4.0, 6.0 }),
   };
-  const ndtbl::FieldGroup<double, 2> group(
+  const ndtbl::FieldGroup<2, double> group(
     ndtbl::Grid<2>(axes),
     { "A", "B" },
     ndtbl_test::build_linear_payload(
@@ -326,7 +436,7 @@ TEST_CASE("runtime field group forwards throw bounds policy",
     ndtbl::Axis::uniform(-1.0, 2.0, 4),
     ndtbl::Axis::uniform(0.0, 6.0, 4),
   };
-  const ndtbl::FieldGroup<double, 2> group(
+  const ndtbl::FieldGroup<2, double> group(
     ndtbl::Grid<2>(axes),
     { "A", "B" },
     ndtbl_test::build_linear_payload(
@@ -334,7 +444,8 @@ TEST_CASE("runtime field group forwards throw bounds policy",
   const std::string path = ndtbl_test::temporary_path();
   ndtbl::write_group(path, group);
 
-  const ndtbl::RuntimeFieldGroup<2> loaded = ndtbl::read_group<2>(path);
+  const ndtbl::RuntimeFieldGroup<2> loaded =
+    ndtbl::read_runtime_field_group<2>(path);
   std::array<double, 2> values = { 0.0, 0.0 };
   REQUIRE_NOTHROW(
     loaded.evaluate_all_linear_into({ -2.0, 7.0 }, values.data()));
@@ -375,7 +486,7 @@ TEST_CASE("field group cubic interpolation exactly recovers 1D cubic data",
     ndtbl::Axis::uniform(-2.0, 3.0, 6),
   };
   const ndtbl::Grid<1> grid(axes);
-  const ndtbl::FieldGroup<double, 1> group(
+  const ndtbl::FieldGroup<1, double> group(
     grid,
     { "cubic" },
     build_single_field_payload(axes, [](const std::array<double, 1>& coords) {
@@ -393,6 +504,26 @@ TEST_CASE("field group cubic interpolation exactly recovers 1D cubic data",
   REQUIRE(into_values[0] == Catch::Approx(cubic_1d(0.4)));
 }
 
+TEST_CASE("field group cubic interpolation supports double output from floats",
+          "[field_group][interpolation][cubic]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 3.0, 4),
+  };
+  const ndtbl::FieldGroup<1, float> group(
+    ndtbl::Grid<1>(axes),
+    { "linear" },
+    { 16777216.0f, 16777218.0f, 16777220.0f, 16777222.0f });
+
+  const std::vector<double> values =
+    group.evaluate_all_cubic_as<double>({ 0.5 });
+  std::array<double, 1> into_values = { 0.0 };
+  group.evaluate_all_cubic_into_as({ 0.5 }, into_values.data());
+
+  REQUIRE(values[0] == Catch::Approx(16777217.0));
+  REQUIRE(into_values[0] == Catch::Approx(16777217.0));
+}
+
 TEST_CASE("field group cubic interpolation exactly recovers explicit-axis data",
           "[field_group][interpolation][cubic]")
 {
@@ -401,7 +532,7 @@ TEST_CASE("field group cubic interpolation exactly recovers explicit-axis data",
     ndtbl::Axis::from_coordinates({ -1.0, -0.25, 0.5, 1.25, 2.5 }),
   };
   const ndtbl::Grid<2> grid(axes);
-  const ndtbl::FieldGroup<double, 2> group(
+  const ndtbl::FieldGroup<2, double> group(
     grid,
     { "cubic" },
     build_single_field_payload(axes, [](const std::array<double, 2>& coords) {
@@ -420,7 +551,7 @@ TEST_CASE("field group cubic interpolation handles boundary windows",
   const std::array<ndtbl::Axis, 1> axes = {
     ndtbl::Axis::uniform(0.0, 4.0, 5),
   };
-  const ndtbl::FieldGroup<double, 1> group(
+  const ndtbl::FieldGroup<1, double> group(
     ndtbl::Grid<1>(axes),
     { "cubic" },
     build_single_field_payload(axes, [](const std::array<double, 1>& coords) {
@@ -452,7 +583,7 @@ TEST_CASE("cubic interpolation respects throw bounds policy",
   const std::array<ndtbl::Axis, 1> axes = {
     ndtbl::Axis::from_coordinates({ -1.0, 0.0, 1.0, 2.0 }),
   };
-  const ndtbl::FieldGroup<double, 1> group(
+  const ndtbl::FieldGroup<1, double> group(
     ndtbl::Grid<1>(axes),
     { "cubic" },
     build_single_field_payload(axes, [](const std::array<double, 1>& coords) {
@@ -477,7 +608,7 @@ TEST_CASE("runtime field groups expose explicit cubic interpolation",
   const std::array<ndtbl::Axis, 1> axes = {
     ndtbl::Axis::uniform(-2.0, 3.0, 6),
   };
-  const ndtbl::FieldGroup<double, 1> group(
+  const ndtbl::FieldGroup<1, double> group(
     ndtbl::Grid<1>(axes),
     { "cubic" },
     build_single_field_payload(axes, [](const std::array<double, 1>& coords) {
@@ -486,7 +617,8 @@ TEST_CASE("runtime field groups expose explicit cubic interpolation",
   const std::string path = ndtbl_test::temporary_path();
   ndtbl::write_group(path, group);
 
-  const ndtbl::RuntimeFieldGroup<1> loaded = ndtbl::read_group<1>(path);
+  const ndtbl::RuntimeFieldGroup<1> loaded =
+    ndtbl::read_runtime_field_group<1>(path);
   const std::vector<double> values = loaded.evaluate_all_cubic({ 0.4 });
 
   REQUIRE(values[0] == Catch::Approx(cubic_1d(0.4)));
