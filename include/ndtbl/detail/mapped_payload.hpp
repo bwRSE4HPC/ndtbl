@@ -4,6 +4,10 @@
 #define NDTBL_ENABLE_MMAP 0
 #endif
 
+#ifndef NDTBL_MMAP_POPULATE
+#define NDTBL_MMAP_POPULATE 0
+#endif
+
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -18,6 +22,18 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
+
+#if NDTBL_MMAP_POPULATE
+#if !NDTBL_ENABLE_MMAP
+#error "NDTBL_MMAP_POPULATE requires NDTBL_ENABLE_MMAP"
+#endif
+#if !defined(__linux__)
+#error "NDTBL_MMAP_POPULATE requires Linux"
+#endif
+#if !defined(MAP_POPULATE)
+#error "NDTBL_MMAP_POPULATE requires MAP_POPULATE"
+#endif
 #endif
 
 namespace ndtbl {
@@ -99,8 +115,13 @@ map_payload_bytes(const std::string& path,
   const std::size_t delta = payload_offset - aligned_offset;
   const std::size_t mapping_length = delta + payload_size;
 
+  int mapping_flags = MAP_PRIVATE;
+#if NDTBL_MMAP_POPULATE
+  mapping_flags |= MAP_POPULATE;
+#endif
+
   void* const mapping =
-    mmap(nullptr, mapping_length, PROT_READ, MAP_PRIVATE, fd, aligned_offset);
+    mmap(nullptr, mapping_length, PROT_READ, mapping_flags, fd, aligned_offset);
   const int saved_errno = errno;
   close(fd);
   if (mapping == MAP_FAILED) {
