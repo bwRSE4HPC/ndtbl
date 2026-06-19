@@ -88,6 +88,53 @@ TEST_CASE("typed field group loader reads known float payloads", "[io]")
   std::remove(path.c_str());
 }
 
+TEST_CASE("payload residency reports availability for supported storage",
+          "[io]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 0.0, 1.0 });
+  const ndtbl::RuntimeFieldGroup<1> runtime(group);
+
+  REQUIRE_FALSE(group.payload_residency().available);
+  REQUIRE_FALSE(runtime.payload_residency().available);
+
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, group);
+
+  const ndtbl::FieldGroup<1, double> loaded =
+    ndtbl::read_field_group<1, double>(path);
+  const ndtbl::RuntimeFieldGroup<1> loaded_runtime =
+    ndtbl::read_runtime_field_group<1>(path);
+
+  const ndtbl::residency_info info = loaded.payload_residency();
+  const ndtbl::residency_info runtime_info = loaded_runtime.payload_residency();
+
+#if NDTBL_ENABLE_MMAP && NDTBL_ENABLE_MMAP_DIAGNOSTICS
+  REQUIRE(info.available);
+  REQUIRE(info.page_size > 0);
+  REQUIRE(info.total_pages > 0);
+  REQUIRE(info.resident_pages <= info.total_pages);
+  REQUIRE(info.resident_bytes == info.resident_pages * info.page_size);
+  REQUIRE(info.resident_fraction >= 0.0);
+  REQUIRE(info.resident_fraction <= 1.0);
+
+  REQUIRE(runtime_info.available);
+  REQUIRE(runtime_info.page_size > 0);
+  REQUIRE(runtime_info.total_pages > 0);
+  REQUIRE(runtime_info.resident_pages <= runtime_info.total_pages);
+  REQUIRE(runtime_info.resident_fraction >= 0.0);
+  REQUIRE(runtime_info.resident_fraction <= 1.0);
+#else
+  REQUIRE_FALSE(info.available);
+  REQUIRE_FALSE(runtime_info.available);
+#endif
+
+  std::remove(path.c_str());
+}
+
 TEST_CASE("typed field group loader rejects wrong scalar type", "[io]")
 {
   const std::array<ndtbl::Axis, 1> axes = {

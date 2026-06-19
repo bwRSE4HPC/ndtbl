@@ -205,6 +205,19 @@ public:
   }
 
   /**
+   * @brief Return OS page residency information for mmap-backed payloads.
+   *
+   * @return Page residency diagnostic information.
+   */
+  residency_info payload_residency() const
+  {
+    if (!impl_) {
+      throw std::runtime_error("ndtbl field group is empty");
+    }
+    return impl_->payload_residency();
+  }
+
+  /**
    * @brief Write the wrapped group to an already opened binary stream.
    *
    * @param os Destination stream in binary mode.
@@ -235,6 +248,7 @@ private:
       const std::array<double, Dim>& coordinates,
       Output* values,
       bounds_policy policy) const = 0;
+    virtual residency_info payload_residency() const = 0;
     virtual void write(std::ostream& os) const = 0;
   };
 
@@ -276,6 +290,11 @@ private:
     {
       group_.template evaluate_all_cubic_into_as<Output>(
         coordinates, values, policy);
+    }
+
+    residency_info payload_residency() const override
+    {
+      return group_.payload_residency();
     }
 
     void write(std::ostream& os) const override

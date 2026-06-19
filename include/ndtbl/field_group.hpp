@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ndtbl/detail/mapped_payload.hpp"
 #include "ndtbl/detail/size_math.hpp"
 #include "ndtbl/grid.hpp"
 #include "ndtbl/payload.hpp"
@@ -77,11 +78,13 @@ public:
   FieldGroup(const Grid<Dim>& grid,
              const std::vector<std::string>& field_names,
              const PayloadView<Stored>& interleaved_values,
-             std::shared_ptr<const std::uint8_t> payload_owner)
+             std::shared_ptr<const std::uint8_t> payload_owner,
+             bool payload_is_mmap = false)
     : grid_(grid)
     , field_names_(field_names)
     , interleaved_values_(interleaved_values)
     , payload_owner_(std::move(payload_owner))
+    , payload_is_mmap_(payload_is_mmap)
   {
     if (interleaved_values_.size() != 0 && !payload_owner_) {
       throw std::invalid_argument("field group payload owner is empty");
@@ -123,6 +126,24 @@ public:
    * @return Point-major interleaved payload view.
    */
   PayloadView<Stored> interleaved_values() const { return interleaved_values_; }
+
+  /**
+   * @brief Return OS page residency information for mmap-backed payloads.
+   *
+   * The returned value has `available=false` unless this group was loaded
+   * through ndtbl's mmap path and mmap diagnostics were enabled at compile
+   * time.
+   *
+   * @return Page residency diagnostic information.
+   */
+  residency_info payload_residency() const
+  {
+    if (!payload_is_mmap_) {
+      return detail::unavailable_residency();
+    }
+    return detail::query_residency(interleaved_values_.byte_data(),
+                                   interleaved_values_.byte_size());
+  }
 
   /**
    * @brief Resolve a field name to its local field index.
@@ -432,6 +453,7 @@ private:
   std::vector<std::string> field_names_;
   PayloadView<Stored> interleaved_values_;
   std::shared_ptr<const std::uint8_t> payload_owner_;
+  bool payload_is_mmap_ = false;
 };
 
 } // namespace ndtbl

@@ -185,7 +185,8 @@ read_field_group(const std::string& path)
     grid,
     metadata.field_names,
     PayloadView<Stored>(payload_owner.get(), layout.value_count),
-    payload_owner);
+    payload_owner,
+    true);
 #else
   // Keep this non-const so the payload buffer can be moved into the read-only
   // FieldGroup storage instead of copied during load.
@@ -237,7 +238,8 @@ read_runtime_field_group(const std::string& path)
       grid,
       metadata.field_names,
       PayloadView<float>(payload_owner.get(), layout.value_count),
-      payload_owner));
+      payload_owner,
+      true));
 #else
     // Keep this non-const so the payload buffer can be moved into the
     // read-only FieldGroup storage instead of copied during load.
@@ -257,7 +259,8 @@ read_runtime_field_group(const std::string& path)
       grid,
       metadata.field_names,
       PayloadView<double>(payload_owner.get(), layout.value_count),
-      payload_owner));
+      payload_owner,
+      true));
 #else
     // Keep this non-const so the payload buffer can be moved into the
     // read-only FieldGroup storage instead of copied during load.
