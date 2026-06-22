@@ -16,9 +16,33 @@ option(ndtbl_BUILD_TESTING "Enable building of tests" OFF)
 
 # Option for enabling POSIX mmap support for payload reads
 option(ndtbl_ENABLE_MMAP "Enable POSIX mmap-backed ndtbl payload reads" OFF)
+option(ndtbl_ENABLE_MMAP_POPULATE
+  "Enable Linux MAP_POPULATE for mmap-backed ndtbl payload reads"
+  OFF
+)
+option(ndtbl_ENABLE_MMAP_DIAGNOSTICS
+  "Enable mmap-backed payload diagnostics"
+  OFF
+)
 
 if(ndtbl_ENABLE_MMAP AND NOT UNIX)
   message(FATAL_ERROR "ndtbl_ENABLE_MMAP requires a POSIX platform")
+endif()
+
+if(ndtbl_ENABLE_MMAP_POPULATE AND NOT ndtbl_ENABLE_MMAP)
+  message(FATAL_ERROR "ndtbl_ENABLE_MMAP_POPULATE requires ndtbl_ENABLE_MMAP")
+endif()
+
+if(ndtbl_ENABLE_MMAP_POPULATE AND NOT LINUX)
+  message(FATAL_ERROR "ndtbl_ENABLE_MMAP_POPULATE requires Linux")
+endif()
+
+if(ndtbl_ENABLE_MMAP_DIAGNOSTICS AND NOT ndtbl_ENABLE_MMAP)
+  message(FATAL_ERROR "ndtbl_ENABLE_MMAP_DIAGNOSTICS requires ndtbl_ENABLE_MMAP")
+endif()
+
+if(ndtbl_ENABLE_MMAP_DIAGNOSTICS AND NOT LINUX)
+  message(FATAL_ERROR "ndtbl_ENABLE_MMAP_DIAGNOSTICS requires a LINUX platform")
 endif()
 
 # Add an interface target for the header-only library
@@ -35,6 +59,7 @@ target_sources(ndtbl
       include/ndtbl/grid.hpp
       include/ndtbl/field_group.hpp
       include/ndtbl/runtime_field_group.hpp
+      include/ndtbl/diagnostics.hpp
       include/ndtbl/metadata.hpp
       include/ndtbl/payload.hpp
       include/ndtbl/io.hpp
@@ -48,6 +73,8 @@ target_sources(ndtbl
 target_compile_definitions(ndtbl
   INTERFACE
     NDTBL_ENABLE_MMAP=$<BOOL:${ndtbl_ENABLE_MMAP}>
+    NDTBL_ENABLE_MMAP_POPULATE=$<BOOL:${ndtbl_ENABLE_MMAP_POPULATE}>
+    NDTBL_ENABLE_MMAP_DIAGNOSTICS=$<BOOL:${ndtbl_ENABLE_MMAP_DIAGNOSTICS}>
 )
 
 # Request a minimum C++ standard for this target

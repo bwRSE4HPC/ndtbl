@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ndtbl/axis.hpp"
+#include "ndtbl/diagnostics.hpp"
 #include "ndtbl/field_group.hpp"
 #include "ndtbl/grid.hpp"
 #include "ndtbl/io.hpp"

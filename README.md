@@ -66,12 +66,31 @@ Relevant CMake options:
 - `ndtbl_BUILD_BENCHMARKS`: build developer lookup benchmarks, default `OFF`
 - `ndtbl_BUILD_DOCS`: build the documentation, default `ON` for top-level builds
 - `ndtbl_ENABLE_MMAP`: enable POSIX-only `mmap`-backed payload reads, default `OFF`
+- `ndtbl_ENABLE_MMAP_POPULATE`: add Linux-only `MAP_POPULATE` to `mmap`-backed
+  payload reads, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
+- `ndtbl_ENABLE_MMAP_DIAGNOSTICS`: enable mmap payload residency diagnostics
+  through `mincore`, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
 
 When `ndtbl_ENABLE_MMAP=OFF` (the default), `read_field_group()` and
 `read_runtime_field_group()` read payload data into owned heap storage. When
 `ndtbl_ENABLE_MMAP=ON`, supported POSIX builds use read-only memory mapping
 instead, which can reduce heap usage for large tables and enables shared memory
-access in multi-process environments.
+access in multi-process environments. On Linux, `ndtbl_ENABLE_MMAP_POPULATE=ON`
+adds `MAP_POPULATE` to the mapping flags so the kernel faults the mapped payload
+in during `mmap()` instead of on first access.
+
+When `ndtbl_ENABLE_MMAP_DIAGNOSTICS=ON`, mmap-loaded field groups can report OS
+page residency for their payload:
+
+```cpp
+const auto info = group.payload_residency();
+if (info.available) {
+  // inspect info.resident_pages, info.total_pages, info.resident_fraction
+}
+```
+
+The diagnostic is page-granular: it reports what `mincore` exposes for the
+mapped payload pages, not exact application RSS or exact bytes touched.
 
 If you want to install the C++ headers and CMake package metadata:
 
@@ -83,6 +102,20 @@ To enable optional `mmap`-backed reads on supported POSIX platforms:
 
 ```bash
 cmake -B build -Dndtbl_ENABLE_MMAP=ON
+cmake --build build
+```
+
+To additionally pre-populate mapped payload pages on Linux:
+
+```bash
+cmake -B build -Dndtbl_ENABLE_MMAP=ON -Dndtbl_ENABLE_MMAP_POPULATE=ON
+cmake --build build
+```
+
+To enable mmap payload residency diagnostics on Linux:
+
+```bash
+cmake -B build -Dndtbl_ENABLE_MMAP=ON -Dndtbl_ENABLE_MMAP_DIAGNOSTICS=ON
 cmake --build build
 ```
 
