@@ -100,7 +100,13 @@ jobs:
 
     - name: Configure cmake
       shell: bash
-      run: cmake -B build -DCMAKE_CXX_FLAGS="--coverage" -Dndtbl_BUILD_TESTING=ON -Dndtbl_BUILD_DOCS=OFF
+      run: |
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_CXX_FLAGS="--coverage -fprofile-update=atomic -O0 -g" \
+          -DCMAKE_EXE_LINKER_FLAGS="--coverage" \
+          -Dndtbl_BUILD_TESTING=ON \
+          -Dndtbl_BUILD_DOCS=OFF
 
     - name: Build
       shell: bash
