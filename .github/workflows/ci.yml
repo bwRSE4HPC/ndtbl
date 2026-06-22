@@ -25,7 +25,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Filter changes
       uses: dorny/paths-filter@v4
@@ -63,7 +63,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Install Doxygen
       uses: ssciwr/doxygen-install@v2
@@ -89,7 +89,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Install LCov
       run: |
@@ -124,7 +124,7 @@ jobs:
         lcov --directory . --capture --output-file coverage.info --ignore-errors mismatch,unused --exclude '*/catch2/*'
 
     - name: Upload C++ coverage to Codecov
-      uses: codecov/codecov-action@v6
+      uses: codecov/codecov-action@v7
       with:
         disable_search: true
         fail_ci_if_error: true
@@ -147,7 +147,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
@@ -172,7 +172,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     - name: Set up Python
       uses: actions/setup-python@v6
@@ -195,7 +195,7 @@ jobs:
         grep -o 'filename="[^"]*"' coverage.xml | head -n 1000
 
     - name: Upload Python coverage to Codecov
-      uses: codecov/codecov-action@v6
+      uses: codecov/codecov-action@v7
       with:
         disable_search: true
         fail_ci_if_error: true
