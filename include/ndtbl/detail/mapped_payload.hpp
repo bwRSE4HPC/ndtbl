@@ -19,8 +19,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <fstream>
 #include <limits>
 #include <memory>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -59,7 +62,7 @@ namespace detail {
 inline residency_info
 unavailable_residency()
 {
-  return residency_info{ false, 0, 0, 0, 0, 0.0 };
+  return residency_info{};
 }
 
 #if NDTBL_ENABLE_MMAP || NDTBL_ENABLE_MMAP_DIAGNOSTICS
@@ -74,11 +77,120 @@ system_error_message(const std::string& prefix)
 
 #if NDTBL_ENABLE_MMAP_DIAGNOSTICS
 
+inline bool
+parse_smaps_header(const std::string& line,
+                   std::uintptr_t& start,
+                   std::uintptr_t& end)
+{
+  unsigned long long parsed_start = 0;
+  unsigned long long parsed_end = 0;
+  if (std::sscanf(line.c_str(), "%llx-%llx", &parsed_start, &parsed_end) != 2) {
+    return false;
+  }
+
+  start = static_cast<std::uintptr_t>(parsed_start);
+  end = static_cast<std::uintptr_t>(parsed_end);
+  return true;
+}
+
+inline std::size_t
+parse_smaps_kib(const std::string& line, const char* key)
+{
+  const std::string key_string(key);
+  if (line.compare(0, key_string.size(), key_string) != 0) {
+    return 0;
+  }
+
+  std::istringstream is(line.substr(key_string.size()));
+  std::size_t value_kib = 0;
+  is >> value_kib;
+  return value_kib;
+}
+
+inline void
+query_smaps_mapping(const void* address, residency_info& info)
+{
+  std::ifstream smaps("/proc/self/smaps");
+  if (!smaps.is_open()) {
+    return;
+  }
+
+  const std::uintptr_t target = reinterpret_cast<std::uintptr_t>(address);
+  std::uintptr_t mapping_start = 0;
+  std::uintptr_t mapping_end = 0;
+  bool in_target_mapping = false;
+  std::string line;
+
+  while (std::getline(smaps, line)) {
+    std::uintptr_t header_start = 0;
+    std::uintptr_t header_end = 0;
+    if (parse_smaps_header(line, header_start, header_end)) {
+      if (in_target_mapping) {
+        return;
+      }
+
+      in_target_mapping = header_start <= target && target < header_end;
+      if (in_target_mapping) {
+        mapping_start = header_start;
+        mapping_end = header_end;
+        info.smaps_available = true;
+        info.smaps_mapping_bytes =
+          static_cast<std::size_t>(mapping_end - mapping_start);
+      }
+      continue;
+    }
+
+    if (!in_target_mapping) {
+      continue;
+    }
+
+    const std::size_t rss_kib = parse_smaps_kib(line, "Rss:");
+    if (rss_kib != 0) {
+      info.smaps_rss_bytes = rss_kib * 1024;
+      continue;
+    }
+
+    const std::size_t pss_kib = parse_smaps_kib(line, "Pss:");
+    if (pss_kib != 0) {
+      info.smaps_pss_bytes = pss_kib * 1024;
+      continue;
+    }
+
+    const std::size_t shared_clean_kib = parse_smaps_kib(line, "Shared_Clean:");
+    if (shared_clean_kib != 0) {
+      info.smaps_shared_clean_bytes = shared_clean_kib * 1024;
+      continue;
+    }
+
+    const std::size_t shared_dirty_kib = parse_smaps_kib(line, "Shared_Dirty:");
+    if (shared_dirty_kib != 0) {
+      info.smaps_shared_dirty_bytes = shared_dirty_kib * 1024;
+      continue;
+    }
+
+    const std::size_t private_clean_kib =
+      parse_smaps_kib(line, "Private_Clean:");
+    if (private_clean_kib != 0) {
+      info.smaps_private_clean_bytes = private_clean_kib * 1024;
+      continue;
+    }
+
+    const std::size_t private_dirty_kib =
+      parse_smaps_kib(line, "Private_Dirty:");
+    if (private_dirty_kib != 0) {
+      info.smaps_private_dirty_bytes = private_dirty_kib * 1024;
+      continue;
+    }
+  }
+}
+
 inline residency_info
 query_residency(const void* address, std::size_t length)
 {
   if (length == 0) {
-    return residency_info{ true, 0, 0, 0, 0, 0.0 };
+    residency_info info;
+    info.available = true;
+    return info;
   }
   if (address == nullptr) {
     throw std::invalid_argument("cannot query residency for a null payload");
@@ -117,13 +229,18 @@ query_residency(const void* address, std::size_t length)
     }
   }
 
-  return residency_info{ true,
-                         page_size,
-                         total_pages,
-                         resident_pages,
-                         resident_pages * page_size,
-                         static_cast<double>(resident_pages) /
-                           static_cast<double>(total_pages) };
+  residency_info info;
+  info.available = true;
+  info.page_size = page_size;
+  info.total_pages = total_pages;
+  info.resident_pages = resident_pages;
+  info.resident_bytes = resident_pages * page_size;
+  info.resident_fraction =
+    static_cast<double>(resident_pages) / static_cast<double>(total_pages);
+
+  query_smaps_mapping(address, info);
+
+  return info;
 }
 
 #else
