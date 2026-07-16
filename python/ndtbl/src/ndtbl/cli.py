@@ -144,7 +144,7 @@ def _echo_query_values(group: FieldGroup, indices: tuple[int, ...]) -> None:
         indices: Zero-based point indices in axis order.
     """
 
-    values = group.values[*indices, :]
+    values = group.values[indices]
     for field_name, value in zip(group.field_names, values, strict=True):
         click.echo(f"{field_name}: {value:g}")
 

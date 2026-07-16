@@ -1,13 +1,15 @@
 import struct
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, cast
 
 import numpy as np
 
 from .model import (
     ExplicitAxis,
     FieldGroup,
+    FloatArray,
+    FloatDType,
     GroupMetadata,
     NdtblFormatError,
     UniformAxis,
@@ -28,11 +30,11 @@ UINT16 = struct.Struct(f"{LITTLE_ENDIAN_PREFIX}H")
 UINT64 = struct.Struct(f"{LITTLE_ENDIAN_PREFIX}Q")
 DOUBLE = struct.Struct(f"{LITTLE_ENDIAN_PREFIX}d")
 
-DTYPE_TO_TAG = {
+DTYPE_TO_TAG: dict[FloatDType, int] = {
     np.dtype(np.float32): SCALAR_FLOAT32,
     np.dtype(np.float64): SCALAR_FLOAT64,
 }
-TAG_TO_DTYPE = {
+TAG_TO_DTYPE: dict[int, FloatDType] = {
     SCALAR_FLOAT32: np.dtype(np.float32),
     SCALAR_FLOAT64: np.dtype(np.float64),
 }
@@ -56,22 +58,22 @@ def _read_exact(stream: BinaryIO, size: int) -> bytes:
 
 def _read_uint8(stream: BinaryIO) -> int:
     """Read one unsigned 8-bit integer from a stream."""
-    return UINT8.unpack(_read_exact(stream, UINT8.size))[0]
+    return int(UINT8.unpack(_read_exact(stream, UINT8.size))[0])
 
 
 def _read_uint16(stream: BinaryIO) -> int:
     """Read one unsigned 16-bit integer from a stream."""
-    return UINT16.unpack(_read_exact(stream, UINT16.size))[0]
+    return int(UINT16.unpack(_read_exact(stream, UINT16.size))[0])
 
 
 def _read_uint64(stream: BinaryIO) -> int:
     """Read one unsigned 64-bit integer from a stream."""
-    return UINT64.unpack(_read_exact(stream, UINT64.size))[0]
+    return int(UINT64.unpack(_read_exact(stream, UINT64.size))[0])
 
 
 def _read_double(stream: BinaryIO) -> float:
     """Read one IEEE-754 double-precision value from a stream."""
-    return DOUBLE.unpack(_read_exact(stream, DOUBLE.size))[0]
+    return float(DOUBLE.unpack(_read_exact(stream, DOUBLE.size))[0])
 
 
 def _write_uint8(stream: BinaryIO, value: int) -> None:
@@ -243,8 +245,11 @@ def read_group_from_stream(stream: BinaryIO) -> FieldGroup:
     values = np.frombuffer(payload, dtype=wire_dtype).astype(
         metadata.dtype, copy=False
     )
-    shaped = values.reshape(
-        (*metadata.axis_sizes, metadata.field_count), order="C"
+    shaped = cast(
+        FloatArray,
+        values.reshape(
+            (*metadata.axis_sizes, metadata.field_count), order="C"
+        ),
     )
     return FieldGroup(
         axes=metadata.axes,

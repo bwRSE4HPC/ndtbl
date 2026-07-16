@@ -1,8 +1,16 @@
 from dataclasses import dataclass
+from typing import cast
 
 import numpy as np
 
-from .model import FieldGroup, UniformAxis, normalize_dtype
+from .model import (
+    FieldGroup,
+    FloatArray,
+    FloatDType,
+    FloatDTypeLike,
+    UniformAxis,
+    normalize_dtype,
+)
 
 FILE_MAGIC_SIZE = 8
 HEADER_PREFIX_SIZE = 1 + 1 + 2 + 8
@@ -61,8 +69,8 @@ class LinearFieldSpec:
 def _linear_field(
     axes: tuple[UniformAxis, ...],
     spec: LinearFieldSpec,
-    dtype: np.dtype[np.float32] | np.dtype[np.float64],
-) -> np.ndarray:
+    dtype: FloatDType,
+) -> FloatArray:
     """Evaluate one linear field over a uniform grid.
 
     Args:
@@ -80,10 +88,13 @@ def _linear_field(
         )
 
     axis_sizes = tuple(axis.size for axis in axes)
-    field = np.full(axis_sizes, spec.offset, dtype=dtype)
+    field = cast(FloatArray, np.full(axis_sizes, spec.offset, dtype=dtype))
 
     for axis_index, coefficient in enumerate(spec.coefficients):
-        coordinates = axes[axis_index].coordinates().astype(dtype, copy=False)
+        coordinates = cast(
+            FloatArray,
+            axes[axis_index].coordinates().astype(dtype, copy=False),
+        )
         broadcast_shape = [1] * len(axes)
         broadcast_shape[axis_index] = axes[axis_index].size
         field += coefficient * coordinates.reshape(broadcast_shape)
@@ -99,7 +110,7 @@ GENERATOR_REGISTRY = {
 def generate_group(
     axes: tuple[UniformAxis, ...],
     field_specs: tuple[LinearFieldSpec, ...],
-    dtype: np.dtype[np.float32] | np.dtype[np.float64] | str = np.float64,
+    dtype: FloatDTypeLike = np.float64,
 ) -> FieldGroup:
     """Generate an in-memory field group from linear field specifications.
 
@@ -132,7 +143,7 @@ def generate_group(
 def estimate_generated_group_size(
     axes: tuple[UniformAxis, ...],
     field_specs: tuple[LinearFieldSpec, ...],
-    dtype: np.dtype[np.float32] | np.dtype[np.float64] | str = np.float64,
+    dtype: FloatDTypeLike = np.float64,
 ) -> GenerationSizeEstimate:
     """Estimate the size of a generated ndtbl file.
 

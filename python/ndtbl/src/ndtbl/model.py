@@ -5,6 +5,10 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 FloatArray: TypeAlias = NDArray[np.float32] | NDArray[np.float64]
+FloatDType: TypeAlias = np.dtype[np.float32] | np.dtype[np.float64]
+FloatDTypeLike: TypeAlias = (
+    FloatDType | type[np.float32] | type[np.float64] | str
+)
 
 
 class NdtblFormatError(RuntimeError):
@@ -110,8 +114,8 @@ Axis: TypeAlias = UniformAxis | ExplicitAxis
 
 
 def normalize_dtype(
-    dtype: np.dtype[np.generic] | str,
-) -> np.dtype[np.float32] | np.dtype[np.float64]:
+    dtype: FloatDTypeLike,
+) -> FloatDType:
     """Normalize supported payload dtypes to canonical NumPy dtypes.
 
     Args:
@@ -191,7 +195,7 @@ def _normalize_values(values: ArrayLike) -> FloatArray:
     return np.ascontiguousarray(array)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class GroupMetadata:
     """Metadata describing an ndtbl field group without payload values.
 
@@ -204,17 +208,23 @@ class GroupMetadata:
 
     axes: tuple[Axis, ...]
     field_names: tuple[str, ...]
-    dtype: np.dtype[np.float32] | np.dtype[np.float64]
+    dtype: FloatDType
     format_version: int = 1
 
-    def __post_init__(self) -> None:
-        """Normalize metadata fields after dataclass initialization."""
-        object.__setattr__(self, "axes", _normalize_axes(self.axes))
+    def __init__(
+        self,
+        axes: tuple[Axis, ...] | list[Axis],
+        field_names: tuple[str, ...] | list[str],
+        dtype: FloatDTypeLike,
+        format_version: int = 1,
+    ) -> None:
+        """Normalize metadata fields during initialization."""
+        object.__setattr__(self, "axes", _normalize_axes(axes))
         object.__setattr__(
-            self, "field_names", _normalize_field_names(self.field_names)
+            self, "field_names", _normalize_field_names(field_names)
         )
-        object.__setattr__(self, "dtype", normalize_dtype(self.dtype))
-        object.__setattr__(self, "format_version", int(self.format_version))
+        object.__setattr__(self, "dtype", normalize_dtype(dtype))
+        object.__setattr__(self, "format_version", int(format_version))
 
     @property
     def dimension(self) -> int:
@@ -245,7 +255,7 @@ class GroupMetadata:
         return str(self.dtype)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, init=False)
 class FieldGroup:
     """In-memory ndtbl payload and metadata.
 
@@ -259,11 +269,16 @@ class FieldGroup:
     field_names: tuple[str, ...]
     values: FloatArray
 
-    def __post_init__(self) -> None:
-        """Validate the payload shape and normalize stored values."""
-        self.axes = _normalize_axes(self.axes)
-        self.field_names = _normalize_field_names(self.field_names)
-        self.values = _normalize_values(self.values)
+    def __init__(
+        self,
+        axes: tuple[Axis, ...] | list[Axis],
+        field_names: tuple[str, ...] | list[str],
+        values: ArrayLike,
+    ) -> None:
+        """Validate and normalize group data during initialization."""
+        self.axes = _normalize_axes(axes)
+        self.field_names = _normalize_field_names(field_names)
+        self.values = _normalize_values(values)
 
         expected_shape = (*self.axis_sizes, self.field_count)
         if self.values.ndim != self.dimension + 1:
@@ -300,7 +315,7 @@ class FieldGroup:
         return point_count
 
     @property
-    def dtype(self) -> np.dtype[np.float32] | np.dtype[np.float64]:
+    def dtype(self) -> FloatDType:
         """Return the normalized payload dtype."""
         return normalize_dtype(self.values.dtype)
 
