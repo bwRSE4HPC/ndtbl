@@ -87,7 +87,7 @@ host_is_little_endian()
 }
 
 template<class UInt>
-inline void
+void
 write_uint_le(std::ostream& os, UInt value)
 {
   static_assert(std::is_unsigned<UInt>::value,
@@ -101,7 +101,7 @@ write_uint_le(std::ostream& os, UInt value)
 }
 
 template<class UInt>
-inline UInt
+UInt
 read_uint_le(std::istream& is)
 {
   static_assert(std::is_unsigned<UInt>::value,
@@ -119,7 +119,7 @@ read_uint_le(std::istream& is)
 }
 
 template<class Float, class UInt>
-inline void
+void
 write_float_le(std::ostream& os, Float value)
 {
   static_assert(std::is_floating_point<Float>::value,
@@ -135,7 +135,7 @@ write_float_le(std::ostream& os, Float value)
 }
 
 template<class Float, class UInt>
-inline Float
+Float
 read_float_le(std::istream& is)
 {
   static_assert(std::is_floating_point<Float>::value,
@@ -204,7 +204,7 @@ require_zero(std::uint64_t value, const std::string& what)
   }
 }
 
-inline constexpr std::size_t
+constexpr std::size_t
 fixed_header_size()
 {
   return sizeof(file_magic) + sizeof(std::uint8_t) + sizeof(std::uint8_t) +
@@ -260,7 +260,7 @@ axis_point_count(const std::vector<Axis>& axes)
  * @param payload Point-major interleaved field payload.
  */
 template<class Stored>
-inline void
+void
 write_group_stream_impl(std::ostream& os,
                         const GroupMetadata& metadata,
                         const PayloadView<Stored>& payload)
@@ -353,7 +353,7 @@ write_group_stream_impl(std::ostream& os,
  *                              const std::vector<Stored>&)
  */
 template<class Stored, std::size_t Dim>
-inline void
+void
 write_group_stream_impl(std::ostream& os, const FieldGroup<Dim, Stored>& group)
 {
   GroupMetadata metadata = { scalar_type_of<Stored>(),
@@ -367,7 +367,7 @@ write_group_stream_impl(std::ostream& os, const FieldGroup<Dim, Stored>& group)
 }
 
 template<class Stored>
-inline void
+void
 write_group_stream_impl(std::ostream& os,
                         const GroupMetadata& metadata,
                         const std::vector<Stored>& payload)
@@ -390,7 +390,7 @@ verify_magic(std::istream& is)
   }
 }
 
-inline constexpr std::size_t
+constexpr std::size_t
 scalar_size(scalar_type type)
 {
   if (type == scalar_type::float32) {
@@ -516,7 +516,7 @@ read_group_metadata_impl(std::istream& is)
  * @return Payload vector with `value_count` entries.
  */
 template<class Stored>
-inline std::vector<Stored>
+std::vector<Stored>
 read_payload(std::istream& is, std::size_t value_count)
 {
   std::vector<Stored> values(value_count);
@@ -546,7 +546,7 @@ read_payload(std::istream& is, std::size_t value_count)
  * @return Fixed-size axis array with `Dim` entries.
  */
 template<std::size_t Dim>
-inline std::array<Axis, Dim>
+std::array<Axis, Dim>
 fixed_axes(const std::vector<Axis>& axes)
 {
   if (axes.size() != Dim) {

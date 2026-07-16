@@ -135,7 +135,7 @@ private:
  * @return Read-only view into `values`.
  */
 template<class Stored>
-inline PayloadView<Stored>
+PayloadView<Stored>
 payload_view(const std::vector<Stored>& values)
 {
   const Stored* data = values.empty() ? nullptr : values.data();

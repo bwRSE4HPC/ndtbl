@@ -79,7 +79,7 @@ write_file_bytes(const std::string& path, const std::vector<char>& bytes)
 }
 
 template<class UInt>
-inline void
+void
 append_uint_le(std::vector<char>& bytes, UInt value)
 {
   for (std::size_t index = 0; index < sizeof(UInt); ++index) {
@@ -104,7 +104,7 @@ append_float_le(std::vector<char>& bytes, float value)
 }
 
 template<std::size_t Dim>
-inline double
+double
 linear_value(const std::array<double, Dim>& coordinates,
              const std::array<double, Dim>& coefficients,
              double intercept)
@@ -117,7 +117,7 @@ linear_value(const std::array<double, Dim>& coordinates,
 }
 
 template<std::size_t Dim>
-inline std::array<double, Dim>
+std::array<double, Dim>
 clamp_to_axes(const std::array<ndtbl::Axis, Dim>& axes,
               const std::array<double, Dim>& coordinates)
 {
@@ -133,7 +133,7 @@ clamp_to_axes(const std::array<ndtbl::Axis, Dim>& axes,
 }
 
 template<std::size_t Dim>
-inline std::vector<double>
+std::vector<double>
 build_linear_payload(const std::array<ndtbl::Axis, Dim>& axes,
                      const std::array<double, Dim>& coeffs_a,
                      double intercept_a,

@@ -29,7 +29,7 @@ namespace ndtbl {
  * @see write_group(const std::string&, const FieldGroup<Dim, Stored>&)
  */
 template<class Stored, std::size_t Dim>
-inline void
+void
 write_group_stream(std::ostream& os, const FieldGroup<Dim, Stored>& group)
 {
   detail::write_group_stream_impl(os, group);
@@ -50,7 +50,7 @@ write_group_stream(std::ostream& os, const FieldGroup<Dim, Stored>& group)
  * @see write_group_stream(std::ostream&, const FieldGroup<Dim, Stored>&)
  */
 template<class Stored>
-inline void
+void
 write_group_stream(std::ostream& os,
                    const GroupMetadata& metadata,
                    const std::vector<Stored>& interleaved_values)
@@ -68,7 +68,7 @@ write_group_stream(std::ostream& os,
  * @see write_group_stream(std::ostream&, const FieldGroup<Dim, Stored>&)
  */
 template<class Stored, std::size_t Dim>
-inline void
+void
 write_group(const std::string& path, const FieldGroup<Dim, Stored>& group)
 {
   std::ofstream os(path.c_str(), std::ios::binary);
@@ -90,7 +90,7 @@ write_group(const std::string& path, const FieldGroup<Dim, Stored>& group)
  *                         const std::vector<Stored>&)
  */
 template<class Stored>
-inline void
+void
 write_group(const std::string& path,
             const GroupMetadata& metadata,
             const std::vector<Stored>& interleaved_values)
@@ -112,7 +112,7 @@ write_group(const std::string& path,
  * @see RuntimeFieldGroup
  */
 template<std::size_t Dim, class Output>
-inline void
+void
 write_group(const std::string& path,
             const RuntimeFieldGroup<Dim, Output>& group)
 {
@@ -159,7 +159,7 @@ read_group_metadata(const std::string& path)
  * @see FieldGroup
  */
 template<std::size_t Dim, class Stored>
-inline FieldGroup<Dim, Stored>
+FieldGroup<Dim, Stored>
 read_field_group(const std::string& path)
 {
   std::ifstream is(path.c_str(), std::ios::binary);
@@ -211,7 +211,7 @@ read_field_group(const std::string& path)
  * @see RuntimeFieldGroup
  */
 template<std::size_t Dim, class Output = double>
-inline RuntimeFieldGroup<Dim, Output>
+RuntimeFieldGroup<Dim, Output>
 read_runtime_field_group(const std::string& path)
 {
   std::ifstream is(path.c_str(), std::ios::binary);
