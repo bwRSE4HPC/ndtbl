@@ -152,12 +152,10 @@ read_float_le(std::istream& is)
 }
 
 template<class Stored>
-struct payload_uint
-{
-  typedef typename std::conditional<sizeof(Stored) == sizeof(std::uint32_t),
-                                    std::uint32_t,
-                                    std::uint64_t>::type type;
-};
+using payload_uint_t =
+  std::conditional_t<sizeof(Stored) == sizeof(std::uint32_t),
+                     std::uint32_t,
+                     std::uint64_t>;
 
 /**
  * @brief Write a length-prefixed UTF-8 string to a binary stream.
@@ -335,7 +333,7 @@ write_group_stream_impl(std::ostream& os,
                   payload.byte_size());
     } else {
       for (std::size_t index = 0; index < payload.size(); ++index) {
-        write_float_le<Stored, typename payload_uint<Stored>::type>(
+        write_float_le<Stored, payload_uint_t<Stored>>(
           os, payload.unchecked(index));
       }
     }
@@ -532,8 +530,7 @@ read_payload(std::istream& is, std::size_t value_count)
   }
 
   for (std::size_t index = 0; index < value_count; ++index) {
-    values[index] =
-      read_float_le<Stored, typename payload_uint<Stored>::type>(is);
+    values[index] = read_float_le<Stored, payload_uint_t<Stored>>(is);
   }
   return values;
 }
