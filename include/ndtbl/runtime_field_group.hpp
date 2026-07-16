@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include "ndtbl/field_group.hpp"

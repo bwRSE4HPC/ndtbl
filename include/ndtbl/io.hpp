@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include "ndtbl/detail/binary_io.hpp"
