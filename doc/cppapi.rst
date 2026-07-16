@@ -6,6 +6,18 @@
 API reference
 -------------
 
+.. doxygenclass:: ndtbl::Error
+   :members:
+
+.. doxygenclass:: ndtbl::FormatError
+   :members:
+
+.. doxygenclass:: ndtbl::IOError
+   :members:
+
+.. doxygenclass:: ndtbl::StateError
+   :members:
+
 .. doxygenclass:: ndtbl::Axis
    :members:
 

@@ -15,6 +15,7 @@
 #endif
 
 #include "ndtbl/diagnostics.hpp"
+#include "ndtbl/exceptions.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -85,7 +86,7 @@ query_residency(const void* address, std::size_t length)
 
   const long page_size_long = sysconf(_SC_PAGESIZE);
   if (page_size_long <= 0) {
-    throw std::runtime_error("failed to query system page size for mincore");
+    throw IOError("failed to query system page size for mincore");
   }
 
   const std::size_t page_size = static_cast<std::size_t>(page_size_long);
@@ -106,7 +107,7 @@ query_residency(const void* address, std::size_t length)
   if (mincore(reinterpret_cast<void*>(aligned_addr),
               total_pages * page_size,
               vec.data()) != 0) {
-    throw std::runtime_error(system_error_message("mincore failed"));
+    throw IOError(system_error_message("mincore failed"));
   }
 
   std::size_t resident_pages = 0;
@@ -172,7 +173,7 @@ map_payload_bytes(const std::string& path,
 
   const int fd = open(path.c_str(), O_RDONLY);
   if (fd < 0) {
-    throw std::runtime_error(
+    throw IOError(
       system_error_message("failed to open ndtbl input file for mmap"));
   }
 
@@ -181,7 +182,7 @@ map_payload_bytes(const std::string& path,
     const int saved_errno = errno;
     close(fd);
     errno = saved_errno;
-    throw std::runtime_error(
+    throw IOError(
       system_error_message("failed to stat ndtbl input file for mmap"));
   }
 
@@ -190,13 +191,13 @@ map_payload_bytes(const std::string& path,
     static_cast<std::uintmax_t>(payload_offset) + payload_size;
   if (payload_end > file_size) {
     close(fd);
-    throw std::runtime_error("ndtbl file payload exceeds file size");
+    throw FormatError("ndtbl file payload exceeds file size");
   }
 
   const long page_size = sysconf(_SC_PAGESIZE);
   if (page_size <= 0) {
     close(fd);
-    throw std::runtime_error("failed to query system page size for mmap");
+    throw IOError("failed to query system page size for mmap");
   }
 
   const std::size_t alignment = static_cast<std::size_t>(page_size);
@@ -216,8 +217,7 @@ map_payload_bytes(const std::string& path,
   close(fd);
   if (mapping == MAP_FAILED) {
     errno = saved_errno;
-    throw std::runtime_error(
-      system_error_message("failed to map ndtbl payload"));
+    throw IOError(system_error_message("failed to map ndtbl payload"));
   }
 
   const std::shared_ptr<mapped_payload_owner> owner =

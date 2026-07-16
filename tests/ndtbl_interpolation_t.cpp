@@ -185,7 +185,7 @@ TEST_CASE("grid rejects shape products exceeding supported size",
     ndtbl::Axis::uniform(0.0, 1.0, huge_extent),
   };
 
-  REQUIRE_THROWS_AS(ndtbl::Grid<2>(axes), std::runtime_error);
+  REQUIRE_THROWS_AS(ndtbl::Grid<2>(axes), std::overflow_error);
 }
 
 TEST_CASE("field group rejects payload shape products exceeding supported size",
@@ -200,7 +200,7 @@ TEST_CASE("field group rejects payload shape products exceeding supported size",
 
   REQUIRE_THROWS_AS(
     (ndtbl::FieldGroup<1, double>(grid, { "A", "B" }, std::vector<double>())),
-    std::runtime_error);
+    std::overflow_error);
 }
 
 TEST_CASE("payload view keeps checked access separate from typed fast access",

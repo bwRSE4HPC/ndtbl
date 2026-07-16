@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "ndtbl/exceptions.hpp"
 #include "ndtbl/field_group.hpp"
 #include "ndtbl/types.hpp"
 
@@ -9,7 +10,6 @@
 #include <cstddef>
 #include <iosfwd>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -69,7 +69,7 @@ public:
   std::size_t field_count() const
   {
     if (!impl_) {
-      throw std::runtime_error("ndtbl field group is empty");
+      throw StateError("ndtbl field group is empty");
     }
     return impl_->field_count();
   }
@@ -82,7 +82,7 @@ public:
   scalar_type value_type() const
   {
     if (!impl_) {
-      throw std::runtime_error("ndtbl field group is empty");
+      throw StateError("ndtbl field group is empty");
     }
     return impl_->value_type();
   }
@@ -95,7 +95,7 @@ public:
   std::vector<std::string> field_names() const
   {
     if (!impl_) {
-      throw std::runtime_error("ndtbl field group is empty");
+      throw StateError("ndtbl field group is empty");
     }
     return impl_->field_names();
   }
@@ -108,7 +108,7 @@ public:
   std::array<Axis, Dim> axes() const
   {
     if (!impl_) {
-      throw std::runtime_error("ndtbl field group is empty");
+      throw StateError("ndtbl field group is empty");
     }
     return impl_->axes();
   }
@@ -122,7 +122,7 @@ public:
   std::size_t field_index(const std::string& field_name) const
   {
     if (!impl_) {
-      throw std::runtime_error("ndtbl field group is empty");
+      throw StateError("ndtbl field group is empty");
     }
     return impl_->field_index(field_name);
   }
@@ -160,7 +160,7 @@ public:
     bounds_policy policy = bounds_policy::clamp) const
   {
     if (!impl_) {
-      throw std::runtime_error("ndtbl field group is empty");
+      throw StateError("ndtbl field group is empty");
     }
     impl_->evaluate_all_linear_into(coordinates, values, policy);
   }
@@ -201,7 +201,7 @@ public:
     bounds_policy policy = bounds_policy::clamp) const
   {
     if (!impl_) {
-      throw std::runtime_error("ndtbl field group is empty");
+      throw StateError("ndtbl field group is empty");
     }
     impl_->evaluate_all_cubic_into(coordinates, values, policy);
   }
@@ -214,7 +214,7 @@ public:
   residency_info payload_residency() const
   {
     if (!impl_) {
-      throw std::runtime_error("ndtbl field group is empty");
+      throw StateError("ndtbl field group is empty");
     }
     return impl_->payload_residency();
   }
@@ -228,7 +228,7 @@ public:
   void write(std::ostream& os) const
   {
     if (!impl_) {
-      throw std::runtime_error("ndtbl field group is empty");
+      throw StateError("ndtbl field group is empty");
     }
     impl_->write(os);
   }

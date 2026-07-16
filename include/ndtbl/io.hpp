@@ -4,6 +4,7 @@
 
 #include "ndtbl/detail/binary_io.hpp"
 #include "ndtbl/detail/mapped_payload.hpp"
+#include "ndtbl/exceptions.hpp"
 #include "ndtbl/runtime_field_group.hpp"
 
 #include <array>
@@ -12,7 +13,6 @@
 #include <fstream>
 #include <memory>
 #include <ostream>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -73,7 +73,7 @@ write_group(const std::string& path, const FieldGroup<Dim, Stored>& group)
 {
   std::ofstream os(path.c_str(), std::ios::binary);
   if (!os.is_open()) {
-    throw std::runtime_error("failed to open ndtbl output file: " + path);
+    throw IOError("failed to open ndtbl output file: " + path);
   }
   write_group_stream(os, group);
 }
@@ -97,7 +97,7 @@ write_group(const std::string& path,
 {
   std::ofstream os(path.c_str(), std::ios::binary);
   if (!os.is_open()) {
-    throw std::runtime_error("failed to open ndtbl output file: " + path);
+    throw IOError("failed to open ndtbl output file: " + path);
   }
   write_group_stream(os, metadata, interleaved_values);
 }
@@ -118,7 +118,7 @@ write_group(const std::string& path,
 {
   std::ofstream os(path.c_str(), std::ios::binary);
   if (!os.is_open()) {
-    throw std::runtime_error("failed to open ndtbl output file: " + path);
+    throw IOError("failed to open ndtbl output file: " + path);
   }
   group.write(os);
 }
@@ -139,7 +139,7 @@ read_group_metadata(const std::string& path)
 {
   std::ifstream is(path.c_str(), std::ios::binary);
   if (!is.is_open()) {
-    throw std::runtime_error("failed to open ndtbl input file: " + path);
+    throw IOError("failed to open ndtbl input file: " + path);
   }
 
   return detail::read_group_metadata_impl(is);
@@ -164,18 +164,16 @@ read_field_group(const std::string& path)
 {
   std::ifstream is(path.c_str(), std::ios::binary);
   if (!is.is_open()) {
-    throw std::runtime_error("failed to open ndtbl input file: " + path);
+    throw IOError("failed to open ndtbl input file: " + path);
   }
 
   const detail::parsed_group_layout layout = detail::read_group_layout_impl(is);
   const GroupMetadata& metadata = layout.metadata;
   if (metadata.dimension != Dim) {
-    throw std::runtime_error(
-      "ndtbl file dimension does not match typed loader");
+    throw FormatError("ndtbl file dimension does not match typed loader");
   }
   if (metadata.value_type != scalar_type_of<Stored>()) {
-    throw std::runtime_error(
-      "ndtbl file scalar type does not match typed loader");
+    throw FormatError("ndtbl file scalar type does not match typed loader");
   }
 
   const std::array<Axis, Dim> axes = detail::fixed_axes<Dim>(metadata.axes);
@@ -219,14 +217,13 @@ read_runtime_field_group(const std::string& path)
 {
   std::ifstream is(path.c_str(), std::ios::binary);
   if (!is.is_open()) {
-    throw std::runtime_error("failed to open ndtbl input file: " + path);
+    throw IOError("failed to open ndtbl input file: " + path);
   }
 
   const detail::parsed_group_layout layout = detail::read_group_layout_impl(is);
   const GroupMetadata& metadata = layout.metadata;
   if (metadata.dimension != Dim) {
-    throw std::runtime_error(
-      "ndtbl file dimension does not match typed loader");
+    throw FormatError("ndtbl file dimension does not match typed loader");
   }
 
   const std::array<Axis, Dim> axes = detail::fixed_axes<Dim>(metadata.axes);
@@ -273,7 +270,7 @@ read_runtime_field_group(const std::string& path)
 #endif
   }
 
-  throw std::runtime_error("unsupported ndtbl scalar type");
+  throw FormatError("unsupported ndtbl scalar type");
 }
 
 } // namespace ndtbl

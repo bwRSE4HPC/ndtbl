@@ -3,6 +3,7 @@
 #pragma once
 
 #include "ndtbl/detail/size_math.hpp"
+#include "ndtbl/exceptions.hpp"
 #include "ndtbl/field_group.hpp"
 #include "ndtbl/metadata.hpp"
 
@@ -41,9 +42,13 @@ static constexpr char file_magic[8] = { 'N', 'D',  'T',  'B',
 inline void
 write_bytes(std::ostream& os, const char* data, std::size_t size)
 {
-  os.write(data, static_cast<std::streamsize>(size));
+  try {
+    os.write(data, static_cast<std::streamsize>(size));
+  } catch (const std::ios_base::failure&) {
+    throw IOError("failed to write ndtbl payload");
+  }
   if (!os.good()) {
-    throw std::runtime_error("failed to write ndtbl payload");
+    throw IOError("failed to write ndtbl payload");
   }
 }
 
@@ -57,9 +62,19 @@ write_bytes(std::ostream& os, const char* data, std::size_t size)
 inline void
 read_bytes(std::istream& is, char* data, std::size_t size)
 {
-  is.read(data, static_cast<std::streamsize>(size));
+  try {
+    is.read(data, static_cast<std::streamsize>(size));
+  } catch (const std::ios_base::failure&) {
+    if (is.eof()) {
+      throw FormatError("unexpected end of ndtbl input");
+    }
+    throw IOError("failed to read ndtbl payload");
+  }
   if (!is.good()) {
-    throw std::runtime_error("failed to read ndtbl payload");
+    if (is.eof()) {
+      throw FormatError("unexpected end of ndtbl input");
+    }
+    throw IOError("failed to read ndtbl payload");
   }
 }
 
@@ -173,7 +188,7 @@ read_string(std::istream& is)
   }
   if (size >
       static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max())) {
-    throw std::runtime_error("ndtbl string length exceeds supported size");
+    throw FormatError("ndtbl string length exceeds supported size");
   }
 
   std::string value(static_cast<std::size_t>(size), '\0');
@@ -185,7 +200,7 @@ inline void
 require_zero(std::uint64_t value, const std::string& what)
 {
   if (value != 0u) {
-    throw std::runtime_error("ndtbl " + what + " must be zero");
+    throw FormatError("ndtbl " + what + " must be zero");
   }
 }
 
@@ -374,7 +389,7 @@ verify_magic(std::istream& is)
   char magic[sizeof(file_magic)] = {};
   read_bytes(is, magic, sizeof(magic));
   if (!std::equal(magic, magic + sizeof(file_magic), file_magic)) {
-    throw std::runtime_error("invalid ndtbl magic header");
+    throw FormatError("invalid ndtbl magic header");
   }
 }
 
@@ -387,7 +402,7 @@ scalar_size(scalar_type type)
   if (type == scalar_type::float64) {
     return sizeof(double);
   }
-  throw std::runtime_error("unsupported ndtbl scalar type");
+  throw FormatError("unsupported ndtbl scalar type");
 }
 
 struct parsed_group_layout
@@ -411,7 +426,7 @@ read_group_layout_impl(std::istream& is)
 
   const std::uint8_t version = read_uint_le<std::uint8_t>(is);
   if (version != current_format_version) {
-    throw std::runtime_error("unsupported ndtbl version");
+    throw FormatError("unsupported ndtbl version");
   }
 
   GroupMetadata metadata;
@@ -438,18 +453,22 @@ read_group_layout_impl(std::istream& is)
     const std::size_t extent =
       narrow_u64_to_size(read_uint_le<std::uint64_t>(is), "axis extent");
 
-    if (kind == axis_kind::uniform) {
-      const double min_value = read_float_le<double, std::uint64_t>(is);
-      const double max_value = read_float_le<double, std::uint64_t>(is);
-      metadata.axes.push_back(Axis::uniform(min_value, max_value, extent));
-    } else if (kind == axis_kind::explicit_coordinates) {
-      std::vector<double> coordinates(extent);
-      for (std::size_t i = 0; i < extent; ++i) {
-        coordinates[i] = read_float_le<double, std::uint64_t>(is);
+    try {
+      if (kind == axis_kind::uniform) {
+        const double min_value = read_float_le<double, std::uint64_t>(is);
+        const double max_value = read_float_le<double, std::uint64_t>(is);
+        metadata.axes.push_back(Axis::uniform(min_value, max_value, extent));
+      } else if (kind == axis_kind::explicit_coordinates) {
+        std::vector<double> coordinates(extent);
+        for (std::size_t i = 0; i < extent; ++i) {
+          coordinates[i] = read_float_le<double, std::uint64_t>(is);
+        }
+        metadata.axes.push_back(Axis::from_coordinates(coordinates));
+      } else {
+        throw FormatError("unsupported ndtbl axis kind");
       }
-      metadata.axes.push_back(Axis::from_coordinates(coordinates));
-    } else {
-      throw std::runtime_error("unsupported ndtbl axis kind");
+    } catch (const std::invalid_argument& error) {
+      throw FormatError(error.what());
     }
   }
 
@@ -459,17 +478,22 @@ read_group_layout_impl(std::istream& is)
   }
 
   if (axis_point_count(metadata.axes) != metadata.point_count) {
-    throw std::runtime_error("ndtbl point count does not match axis extents");
+    throw FormatError("ndtbl point count does not match axis extents");
   }
 
-  const std::istream::pos_type payload_position = is.tellg();
+  std::istream::pos_type payload_position = std::istream::pos_type(-1);
+  try {
+    payload_position = is.tellg();
+  } catch (const std::ios_base::failure&) {
+    throw IOError("failed to determine ndtbl payload offset");
+  }
   if (payload_position < 0) {
-    throw std::runtime_error("failed to determine ndtbl payload offset");
+    throw IOError("failed to determine ndtbl payload offset");
   }
   const std::size_t actual_payload_offset =
     static_cast<std::size_t>(payload_position);
   if (actual_payload_offset != payload_offset) {
-    throw std::runtime_error("ndtbl payload offset does not match metadata");
+    throw FormatError("ndtbl payload offset does not match metadata");
   }
 
   parsed_group_layout layout;
