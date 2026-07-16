@@ -353,7 +353,7 @@ TEST_CASE("runtime field group can be evaluated concurrently", "[io]")
   };
   std::vector<float> payload;
   for (std::size_t point = 0; point < axes[0].size(); ++point) {
-    const float coordinate = static_cast<float>(axes[0].coordinate(point));
+    const auto coordinate = static_cast<float>(axes[0].coordinate(point));
     payload.push_back(coordinate);
     payload.push_back(10.0f + 2.0f * coordinate);
   }
@@ -371,8 +371,7 @@ TEST_CASE("runtime field group can be evaluated concurrently", "[io]")
     threads.push_back(std::thread([&, thread]() {
       std::array<double, 2> values = { 0.0, 0.0 };
       for (std::size_t iteration = 0; iteration < iterations; ++iteration) {
-        const double coordinate =
-          static_cast<double>((thread + iteration) % 16);
+        const auto coordinate = static_cast<double>((thread + iteration) % 16);
         runtime.evaluate_all_linear_into({ coordinate }, values.data());
         if (values[0] != Catch::Approx(coordinate) ||
             values[1] != Catch::Approx(10.0 + 2.0 * coordinate)) {
@@ -383,12 +382,12 @@ TEST_CASE("runtime field group can be evaluated concurrently", "[io]")
     }));
   }
 
-  for (std::size_t thread = 0; thread < threads.size(); ++thread) {
-    threads[thread].join();
+  for (auto& thread : threads) {
+    thread.join();
   }
 
-  for (std::size_t thread = 0; thread < failures.size(); ++thread) {
-    REQUIRE(failures[thread] == 0);
+  for (const auto failure : failures) {
+    REQUIRE(failure == 0);
   }
 }
 

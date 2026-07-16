@@ -225,9 +225,8 @@ TEST_CASE("field group evaluates unaligned byte-backed payloads",
   };
   const std::vector<double> payload = { 1.0, 3.0 };
 
-  std::shared_ptr<std::vector<std::uint8_t>> storage =
-    std::make_shared<std::vector<std::uint8_t>>(
-      payload.size() * sizeof(double) + 1u);
+  auto storage = std::make_shared<std::vector<std::uint8_t>>(
+    payload.size() * sizeof(double) + 1u);
   std::uint8_t* const unaligned_data = storage->data() + 1u;
   std::memcpy(unaligned_data, payload.data(), payload.size() * sizeof(double));
 

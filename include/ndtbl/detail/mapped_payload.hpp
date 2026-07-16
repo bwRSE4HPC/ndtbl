@@ -89,10 +89,10 @@ query_residency(const void* address, std::size_t length)
     throw IOError("failed to query system page size for mincore");
   }
 
-  const std::size_t page_size = static_cast<std::size_t>(page_size_long);
-  const std::uintptr_t addr = reinterpret_cast<std::uintptr_t>(address);
+  const auto page_size = static_cast<std::size_t>(page_size_long);
+  const auto addr = reinterpret_cast<std::uintptr_t>(address);
   const std::uintptr_t aligned_addr = addr - (addr % page_size);
-  const std::size_t delta = static_cast<std::size_t>(addr - aligned_addr);
+  const auto delta = static_cast<std::size_t>(addr - aligned_addr);
   if (length > std::numeric_limits<std::size_t>::max() - delta) {
     throw std::overflow_error("payload residency range is too large");
   }
@@ -111,8 +111,8 @@ query_residency(const void* address, std::size_t length)
   }
 
   std::size_t resident_pages = 0;
-  for (std::size_t index = 0; index < vec.size(); ++index) {
-    if ((vec[index] & 1U) != 0U) {
+  for (const auto page : vec) {
+    if ((page & 1U) != 0U) {
       ++resident_pages;
     }
   }
@@ -186,8 +186,8 @@ map_payload_bytes(const std::string& path,
       system_error_message("failed to stat ndtbl input file for mmap"));
   }
 
-  const std::uintmax_t file_size = static_cast<std::uintmax_t>(status.st_size);
-  const std::uintmax_t payload_end =
+  const auto file_size = static_cast<std::uintmax_t>(status.st_size);
+  const auto payload_end =
     static_cast<std::uintmax_t>(payload_offset) + payload_size;
   if (payload_end > file_size) {
     close(fd);
@@ -200,7 +200,7 @@ map_payload_bytes(const std::string& path,
     throw IOError("failed to query system page size for mmap");
   }
 
-  const std::size_t alignment = static_cast<std::size_t>(page_size);
+  const auto alignment = static_cast<std::size_t>(page_size);
   const std::size_t aligned_offset =
     payload_offset - (payload_offset % alignment);
   const std::size_t delta = payload_offset - aligned_offset;
@@ -220,9 +220,9 @@ map_payload_bytes(const std::string& path,
     throw IOError(system_error_message("failed to map ndtbl payload"));
   }
 
-  const std::shared_ptr<mapped_payload_owner> owner =
+  const auto owner =
     std::make_shared<mapped_payload_owner>(mapping, mapping_length);
-  const std::uint8_t* const data =
+  const auto* const data =
     reinterpret_cast<const std::uint8_t*>(mapping) + delta;
   return std::shared_ptr<const std::uint8_t>(owner, data);
 }

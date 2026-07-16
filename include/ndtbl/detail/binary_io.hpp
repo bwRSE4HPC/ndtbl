@@ -82,7 +82,7 @@ inline bool
 host_is_little_endian()
 {
   const std::uint16_t marker = 1u;
-  const unsigned char* bytes = reinterpret_cast<const unsigned char*>(&marker);
+  const auto* bytes = reinterpret_cast<const unsigned char*>(&marker);
   return bytes[0] == 1u;
 }
 
@@ -145,7 +145,7 @@ read_float_le(std::istream& is)
   static_assert(std::numeric_limits<Float>::is_iec559,
                 "ndtbl requires IEEE-754 floating-point types");
 
-  const UInt bits = read_uint_le<UInt>(is);
+  const auto bits = read_uint_le<UInt>(is);
   Float value;
   std::memcpy(&value, &bits, sizeof(value));
   return value;
@@ -168,7 +168,7 @@ struct payload_uint
 inline void
 write_string(std::ostream& os, const std::string& value)
 {
-  const std::uint64_t size = static_cast<std::uint64_t>(value.size());
+  const auto size = static_cast<std::uint64_t>(value.size());
   write_uint_le(os, size);
   write_bytes(os, value.data(), value.size());
 }
@@ -182,7 +182,7 @@ write_string(std::ostream& os, const std::string& value)
 inline std::string
 read_string(std::istream& is)
 {
-  const std::uint64_t size = read_uint_le<std::uint64_t>(is);
+  const auto size = read_uint_le<std::uint64_t>(is);
   if (size == 0) {
     return std::string();
   }
@@ -216,8 +216,7 @@ metadata_size(const GroupMetadata& metadata)
 {
   std::size_t total = fixed_header_size();
 
-  for (std::size_t axis = 0; axis < metadata.axes.size(); ++axis) {
-    const Axis& axis_spec = metadata.axes[axis];
+  for (const auto& axis_spec : metadata.axes) {
     total = checked_add_size(total,
                              sizeof(std::uint8_t) + sizeof(std::uint8_t) +
                                sizeof(std::uint16_t) + sizeof(std::uint64_t),
@@ -233,10 +232,9 @@ metadata_size(const GroupMetadata& metadata)
     }
   }
 
-  for (std::size_t field = 0; field < metadata.field_names.size(); ++field) {
+  for (const auto& field_name : metadata.field_names) {
     total = checked_add_size(total, sizeof(std::uint64_t), "metadata size");
-    total = checked_add_size(
-      total, metadata.field_names[field].size(), "metadata size");
+    total = checked_add_size(total, field_name.size(), "metadata size");
   }
 
   return total;
@@ -246,9 +244,9 @@ inline std::size_t
 axis_point_count(const std::vector<Axis>& axes)
 {
   std::size_t point_count = 1;
-  for (std::size_t axis = 0; axis < axes.size(); ++axis) {
+  for (const auto& axis : axes) {
     point_count =
-      checked_multiply_size(point_count, axes[axis].size(), "point count");
+      checked_multiply_size(point_count, axis.size(), "point count");
   }
   return point_count;
 }
@@ -308,8 +306,7 @@ write_group_stream_impl(std::ostream& os,
   write_uint_le<std::uint64_t>(
     os, static_cast<std::uint64_t>(metadata.point_count));
 
-  for (std::size_t axis = 0; axis < metadata.axes.size(); ++axis) {
-    const Axis& axis_spec = metadata.axes[axis];
+  for (const auto& axis_spec : metadata.axes) {
     write_uint_le<std::uint8_t>(os,
                                 static_cast<std::uint8_t>(axis_spec.kind()));
     write_uint_le<std::uint8_t>(os, 0u);
@@ -321,14 +318,14 @@ write_group_stream_impl(std::ostream& os,
       write_float_le<double, std::uint64_t>(os, axis_spec.max());
     } else {
       const std::vector<double> coordinates = axis_spec.coordinates();
-      for (std::size_t i = 0; i < coordinates.size(); ++i) {
-        write_float_le<double, std::uint64_t>(os, coordinates[i]);
+      for (const auto coordinate : coordinates) {
+        write_float_le<double, std::uint64_t>(os, coordinate);
       }
     }
   }
 
-  for (std::size_t field = 0; field < metadata.field_names.size(); ++field) {
-    write_string(os, metadata.field_names[field]);
+  for (const auto& field_name : metadata.field_names) {
+    write_string(os, field_name);
   }
 
   if (payload.size() != 0) {
@@ -424,7 +421,7 @@ read_group_layout_impl(std::istream& is)
 {
   verify_magic(is);
 
-  const std::uint8_t version = read_uint_le<std::uint8_t>(is);
+  const auto version = read_uint_le<std::uint8_t>(is);
   if (version != current_format_version) {
     throw FormatError("unsupported ndtbl version");
   }
@@ -446,8 +443,7 @@ read_group_layout_impl(std::istream& is)
 
   metadata.axes.reserve(metadata.dimension);
   for (std::size_t axis = 0; axis < metadata.dimension; ++axis) {
-    const axis_kind kind =
-      static_cast<axis_kind>(read_uint_le<std::uint8_t>(is));
+    const auto kind = static_cast<axis_kind>(read_uint_le<std::uint8_t>(is));
     require_zero(read_uint_le<std::uint8_t>(is), "axis reserved byte");
     require_zero(read_uint_le<std::uint16_t>(is), "axis reserved field");
     const std::size_t extent =
@@ -455,8 +451,8 @@ read_group_layout_impl(std::istream& is)
 
     try {
       if (kind == axis_kind::uniform) {
-        const double min_value = read_float_le<double, std::uint64_t>(is);
-        const double max_value = read_float_le<double, std::uint64_t>(is);
+        const auto min_value = read_float_le<double, std::uint64_t>(is);
+        const auto max_value = read_float_le<double, std::uint64_t>(is);
         metadata.axes.push_back(Axis::uniform(min_value, max_value, extent));
       } else if (kind == axis_kind::explicit_coordinates) {
         std::vector<double> coordinates(extent);
@@ -490,8 +486,7 @@ read_group_layout_impl(std::istream& is)
   if (payload_position < 0) {
     throw IOError("failed to determine ndtbl payload offset");
   }
-  const std::size_t actual_payload_offset =
-    static_cast<std::size_t>(payload_position);
+  const auto actual_payload_offset = static_cast<std::size_t>(payload_position);
   if (actual_payload_offset != payload_offset) {
     throw FormatError("ndtbl payload offset does not match metadata");
   }

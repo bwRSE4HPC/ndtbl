@@ -155,7 +155,7 @@ public:
    */
   std::size_t field_index(const std::string& name) const
   {
-    const std::vector<std::string>::const_iterator found =
+    const auto found =
       std::find(field_names_.begin(), field_names_.end(), name);
     if (found == field_names_.end()) {
       throw std::out_of_range("field not found in ndtbl field group");
@@ -400,7 +400,7 @@ private:
                                Output* results) const
   {
     for (std::size_t point = 0; point < Stencil::points; ++point) {
-      const Output weight = static_cast<Output>(stencil.weight(point));
+      const auto weight = static_cast<Output>(stencil.weight(point));
       const std::size_t base = stencil.point_index(point) * fields;
       for (std::size_t field = 0; field < fields; ++field) {
         const Stored value = values[base + field];
@@ -415,7 +415,7 @@ private:
                                Output* results) const
   {
     for (std::size_t point = 0; point < Stencil::points; ++point) {
-      const Output weight = static_cast<Output>(stencil.weight(point));
+      const auto weight = static_cast<Output>(stencil.weight(point));
       const std::size_t base = stencil.point_index(point) * fields;
       for (std::size_t field = 0; field < fields; ++field) {
         const Stored value = interleaved_values_.unchecked(base + field);
@@ -426,7 +426,7 @@ private:
 
   void adopt_owned_payload(std::vector<Stored>&& interleaved_values)
   {
-    const std::shared_ptr<std::vector<Stored>> storage =
+    const auto storage =
       std::make_shared<std::vector<Stored>>(std::move(interleaved_values));
     const Stored* const data = storage->empty() ? nullptr : storage->data();
     interleaved_values_ = PayloadView<Stored>(data, storage->size());

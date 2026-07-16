@@ -190,8 +190,7 @@ read_field_group(const std::string& path)
 #else
   // Keep this non-const so the payload buffer can be moved into the read-only
   // FieldGroup storage instead of copied during load.
-  std::vector<Stored> values =
-    detail::read_payload<Stored>(is, layout.value_count);
+  auto values = detail::read_payload<Stored>(is, layout.value_count);
   return FieldGroup<Dim, Stored>(grid, metadata.field_names, std::move(values));
 #endif
 }
@@ -242,8 +241,7 @@ read_runtime_field_group(const std::string& path)
 #else
     // Keep this non-const so the payload buffer can be moved into the
     // read-only FieldGroup storage instead of copied during load.
-    std::vector<float> values =
-      detail::read_payload<float>(is, layout.value_count);
+    auto values = detail::read_payload<float>(is, layout.value_count);
     return RuntimeFieldGroup<Dim, Output>(
       FieldGroup<Dim, float>(grid, metadata.field_names, std::move(values)));
 #endif
@@ -263,8 +261,7 @@ read_runtime_field_group(const std::string& path)
 #else
     // Keep this non-const so the payload buffer can be moved into the
     // read-only FieldGroup storage instead of copied during load.
-    std::vector<double> values =
-      detail::read_payload<double>(is, layout.value_count);
+    auto values = detail::read_payload<double>(is, layout.value_count);
     return RuntimeFieldGroup<Dim, Output>(
       FieldGroup<Dim, double>(grid, metadata.field_names, std::move(values)));
 #endif
