@@ -1,10 +1,10 @@
 # ndtbl
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/pypi/l/ndtbl?label=License)](https://opensource.org/licenses/MIT)
 [![codecov](https://codecov.io/gh/thomasisensee/ndtbl/graph/badge.svg?flag=python&token=5N4GQ0YP7I)](https://codecov.io/gh/thomasisensee/ndtbl)
-[![PyPI](https://img.shields.io/pypi/v/ndtbl)](https://pypi.org/project/ndtbl)
-[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/thomasisensee/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/thomasisensee/ndtbl/main)
-![Python](https://img.shields.io/badge/python-3.11%20|%203.12%20|%203.13%20|%203.14-blue)
+[![pre-commit.ci](https://results.pre-commit.ci/badge/github/thomasisensee/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/thomasisensee/ndtbl/main)
+[![PyPI](https://img.shields.io/pypi/v/ndtbl?logo=pypi&logoColor=gold&label=PyPI)](https://pypi.org/project/ndtbl)
+[![Python](https://img.shields.io/pypi/pyversions/ndtbl?logo=python&logoColor=gold&label=Python)](https://pypi.org/project/ndtbl)
 
 Pure-Python tools for reading, writing, inspecting, and generating `.ndtbl`
 files without depending on the C++ binaries.
