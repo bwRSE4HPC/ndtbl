@@ -79,12 +79,12 @@ public:
    */
   FieldGroup(const Grid<Dim>& grid,
              const std::vector<std::string>& field_names,
-             const PayloadView<Stored>& interleaved_values,
+             PayloadView<Stored> interleaved_values,
              std::shared_ptr<const std::uint8_t> payload_owner,
              bool payload_is_mmap = false)
     : grid_(grid)
     , field_names_(field_names)
-    , interleaved_values_(interleaved_values)
+    , interleaved_values_(std::move(interleaved_values))
     , payload_owner_(std::move(payload_owner))
     , payload_is_mmap_(payload_is_mmap)
   {
