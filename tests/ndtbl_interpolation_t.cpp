@@ -15,6 +15,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -176,6 +177,8 @@ static_assert(ndtbl::LinearStencil<4>::points == 16,
               "4D linear interpolation should use 16 table points");
 static_assert(ndtbl::CubicStencil<4>::points == 256,
               "4D cubic interpolation should use 256 table points");
+static_assert(!std::is_default_constructible<ndtbl::LinearStencil<4>>::value,
+              "interpolation stencils must be constructed by a grid");
 
 TEST_CASE("grid rejects shape products exceeding supported size",
           "[grid][validation]")

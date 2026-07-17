@@ -103,6 +103,8 @@ private:
   template<std::size_t>
   friend class Grid;
 
+  TensorStencil() = default;
+
   std::array<std::size_t, points> point_indices_;
   std::array<double, points> weights_;
 };
