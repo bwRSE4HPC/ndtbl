@@ -286,7 +286,7 @@ public:
    * per axis. Along each axis, the one-dimensional weights are the cubic
    * Lagrange basis weights for the selected four axis coordinates:
    * \f[
-   *   L_i(x) = prod_{j != i} (x - x_j) / (x_i - x_j)
+   *   L_i(x) = \prod_{j \ne i} \frac{x - x_j}{x_i - x_j}
    * \f]
    * The multidimensional stencil is formed as the tensor product of these
    * one-dimensional Lagrange weights. Consequently, the stencil contains
@@ -364,7 +364,9 @@ private:
    * Given four support point indices on the selected axis and a query
    * coordinate, this function computes the four Lagrange basis weights
    *
-   *   w_i = prod_{j != i} (x - x_j) / (x_i - x_j)
+   * \f[
+   *   w_i = \prod_{j \ne i} \frac{x - x_j}{x_i - x_j}
+   * \f]
    *
    * using the actual axis coordinates `x_i`. The resulting weights define the
    * unique cubic polynomial, restricted to this local four-point stencil, that
