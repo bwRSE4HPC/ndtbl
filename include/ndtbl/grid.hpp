@@ -285,9 +285,9 @@ public:
    * This method builds a local interpolation stencil using four support points
    * per axis. Along each axis, the one-dimensional weights are the cubic
    * Lagrange basis weights for the selected four axis coordinates:
-   *
+   * \f[
    *   L_i(x) = prod_{j != i} (x - x_j) / (x_i - x_j)
-   *
+   * \f]
    * The multidimensional stencil is formed as the tensor product of these
    * one-dimensional Lagrange weights. Consequently, the stencil contains
    * `4^Dim` table values.
