@@ -79,7 +79,7 @@ print(loaded.values[1, 0, :])
 The `values` array shape is `axis_0 x axis_1 x ... x field`.
 
 ### Demo notebook
-Use the [demo notebook](https://github.com/thomasisensee/ndtbl/blob/pyproject/python/ndtbl/notebooks/demo.ipynb) to test the Python functionality of `ndtbl` and see how it can be used to read and write binary `.ndtbl` files.
+Use the [demo notebook](https://github.com/thomasisensee/ndtbl/blob/main/python/ndtbl/notebooks/demo.ipynb) to test the Python functionality of `ndtbl` and see how it can be used to read and write binary `.ndtbl` files.
 
 
 ## 💻 CLI
