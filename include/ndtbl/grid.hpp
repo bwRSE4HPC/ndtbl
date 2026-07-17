@@ -103,6 +103,8 @@ private:
   template<std::size_t>
   friend class Grid;
 
+  TensorStencil() = default;
+
   std::array<std::size_t, points> point_indices_;
   std::array<double, points> weights_;
 };
@@ -225,22 +227,6 @@ public:
   std::size_t point_count() const { return point_count_; }
 
   /**
-   * @brief Check whether another grid uses the same axes.
-   *
-   * @param other Grid to compare against.
-   * @return `true` if all axes are equivalent.
-   */
-  bool equivalent(const Grid& other) const
-  {
-    for (std::size_t axis = 0; axis < Dim; ++axis) {
-      if (!axes_[axis].equivalent(other.axes_[axis])) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
    * @brief Precompute the multilinear interpolation stencil for one query
    * point.
    *
@@ -268,12 +254,15 @@ public:
     }
 
     LinearStencil<Dim> prepared;
-    for (std::size_t mask = 0; mask < LinearStencil<Dim>::points; ++mask) {
+    // Enumerate all corners of the bracketing cell. Bit `axis` selects the
+    // lower (0) or upper (1) endpoint on that axis.
+    for (std::size_t corner_mask = 0; corner_mask < LinearStencil<Dim>::points;
+         ++corner_mask) {
       double weight = 1.0;
       std::size_t linear_index = 0;
 
       for (std::size_t axis = 0; axis < Dim; ++axis) {
-        const bool use_upper = (mask & (std::size_t(1) << axis)) != 0;
+        const bool use_upper = (corner_mask & (std::size_t(1) << axis)) != 0;
         const std::size_t index =
           use_upper ? upper_indices[axis] : lower_indices[axis];
         const double axis_weight =
@@ -282,8 +271,8 @@ public:
         weight *= axis_weight;
       }
 
-      prepared.point_indices_[mask] = linear_index;
-      prepared.weights_[mask] = weight;
+      prepared.point_indices_[corner_mask] = linear_index;
+      prepared.weights_[corner_mask] = weight;
     }
 
     return prepared;
@@ -296,9 +285,9 @@ public:
    * This method builds a local interpolation stencil using four support points
    * per axis. Along each axis, the one-dimensional weights are the cubic
    * Lagrange basis weights for the selected four axis coordinates:
-   *
+   * \f[
    *   L_i(x) = prod_{j != i} (x - x_j) / (x_i - x_j)
-   *
+   * \f]
    * The multidimensional stencil is formed as the tensor product of these
    * one-dimensional Lagrange weights. Consequently, the stencil contains
    * `4^Dim` table values.

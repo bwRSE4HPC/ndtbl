@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "ndtbl/ndtbl.hpp"
 
 #include <exception>

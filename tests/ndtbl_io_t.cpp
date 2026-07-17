@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "ndtbl/ndtbl.hpp"
 
 #include "test_support.hpp"
@@ -9,9 +11,69 @@
 #include <cstdint>
 #include <cstdio>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
+
+static_assert(std::is_base_of<std::runtime_error, ndtbl::Error>::value,
+              "ndtbl errors must expose the standard runtime-error API");
+static_assert(std::is_base_of<ndtbl::Error, ndtbl::FormatError>::value,
+              "format errors must derive from the ndtbl error base");
+static_assert(std::is_base_of<ndtbl::Error, ndtbl::IOError>::value,
+              "I/O errors must derive from the ndtbl error base");
+static_assert(std::is_base_of<ndtbl::Error, ndtbl::StateError>::value,
+              "state errors must derive from the ndtbl error base");
+
+TEST_CASE("ndtbl exceptions preserve messages and support base catches",
+          "[exceptions]")
+{
+  REQUIRE_THROWS_AS([]() { throw ndtbl::FormatError("invalid table"); }(),
+                    ndtbl::Error);
+  REQUIRE_THROWS_AS([]() { throw ndtbl::IOError("failed read"); }(),
+                    std::exception);
+
+  const ndtbl::StateError error("empty group");
+  REQUIRE(std::string(error.what()) == "empty group");
+}
+
+TEST_CASE("file and stream failures use ndtbl I/O errors", "[exceptions][io]")
+{
+  const std::string missing_path = ndtbl_test::temporary_path();
+  std::remove(missing_path.c_str());
+  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(missing_path), ndtbl::IOError);
+
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 0.0, 1.0 });
+  std::ostringstream failed_output;
+  failed_output.setstate(std::ios::badbit);
+  REQUIRE_THROWS_AS(ndtbl::write_group_stream(failed_output, group),
+                    ndtbl::IOError);
+}
+
+TEST_CASE("empty runtime field groups use ndtbl state errors",
+          "[exceptions][field_group]")
+{
+  const ndtbl::RuntimeFieldGroup<1> group;
+  std::array<double, 1> values = { 0.0 };
+  std::ostringstream output;
+
+  REQUIRE_THROWS_AS(group.field_count(), ndtbl::StateError);
+  REQUIRE_THROWS_AS(group.value_type(), ndtbl::StateError);
+  REQUIRE_THROWS_AS(group.field_names(), ndtbl::StateError);
+  REQUIRE_THROWS_AS(group.axes(), ndtbl::StateError);
+  REQUIRE_THROWS_AS(group.field_index("A"), ndtbl::StateError);
+  REQUIRE_THROWS_AS(group.evaluate_all_linear_into({ 0.5 }, values.data()),
+                    ndtbl::StateError);
+  REQUIRE_THROWS_AS(group.evaluate_all_cubic_into({ 0.5 }, values.data()),
+                    ndtbl::StateError);
+  REQUIRE_THROWS_AS(group.payload_residency(), ndtbl::StateError);
+  REQUIRE_THROWS_AS(group.write(output), ndtbl::StateError);
+}
 
 TEST_CASE("typed loader round-trips metadata and float payloads", "[io]")
 {
@@ -147,7 +209,7 @@ TEST_CASE("typed field group loader rejects wrong scalar type", "[io]")
   ndtbl::write_group(path, group);
 
   REQUIRE_THROWS_AS((ndtbl::read_field_group<1, float>(path)),
-                    std::runtime_error);
+                    ndtbl::FormatError);
 
   std::remove(path.c_str());
 }
@@ -291,7 +353,7 @@ TEST_CASE("runtime field group can be evaluated concurrently", "[io]")
   };
   std::vector<float> payload;
   for (std::size_t point = 0; point < axes[0].size(); ++point) {
-    const float coordinate = static_cast<float>(axes[0].coordinate(point));
+    const auto coordinate = static_cast<float>(axes[0].coordinate(point));
     payload.push_back(coordinate);
     payload.push_back(10.0f + 2.0f * coordinate);
   }
@@ -309,8 +371,7 @@ TEST_CASE("runtime field group can be evaluated concurrently", "[io]")
     threads.push_back(std::thread([&, thread]() {
       std::array<double, 2> values = { 0.0, 0.0 };
       for (std::size_t iteration = 0; iteration < iterations; ++iteration) {
-        const double coordinate =
-          static_cast<double>((thread + iteration) % 16);
+        const auto coordinate = static_cast<double>((thread + iteration) % 16);
         runtime.evaluate_all_linear_into({ coordinate }, values.data());
         if (values[0] != Catch::Approx(coordinate) ||
             values[1] != Catch::Approx(10.0 + 2.0 * coordinate)) {
@@ -321,12 +382,12 @@ TEST_CASE("runtime field group can be evaluated concurrently", "[io]")
     }));
   }
 
-  for (std::size_t thread = 0; thread < threads.size(); ++thread) {
-    threads[thread].join();
+  for (auto& thread : threads) {
+    thread.join();
   }
 
-  for (std::size_t thread = 0; thread < failures.size(); ++thread) {
-    REQUIRE(failures[thread] == 0);
+  for (const auto failure : failures) {
+    REQUIRE(failure == 0);
   }
 }
 
@@ -342,9 +403,9 @@ TEST_CASE("typed loader rejects mismatched dimensions", "[io]")
   ndtbl::write_group(path, group);
 
   REQUIRE_THROWS_AS(ndtbl::read_runtime_field_group<2>(path),
-                    std::runtime_error);
+                    ndtbl::FormatError);
   REQUIRE_THROWS_AS((ndtbl::read_field_group<2, double>(path)),
-                    std::runtime_error);
+                    ndtbl::FormatError);
 
   std::remove(path.c_str());
 }
@@ -366,7 +427,7 @@ TEST_CASE("typed loader rejects truncated payload files", "[io]")
   ndtbl_test::write_file_bytes(path, bytes);
 
   REQUIRE_THROWS_AS(ndtbl::read_runtime_field_group<1>(path),
-                    std::runtime_error);
+                    ndtbl::FormatError);
 
   std::remove(path.c_str());
 }
@@ -423,7 +484,30 @@ TEST_CASE("typed loader rejects nonzero reserved header fields", "[io]")
   bytes[10] = 1;
   ndtbl_test::write_file_bytes(path, bytes);
 
-  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), std::runtime_error);
+  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), ndtbl::FormatError);
+
+  std::remove(path.c_str());
+}
+
+TEST_CASE("typed loader translates invalid file axes to format errors", "[io]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 0.0, 1.0 });
+
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, group);
+
+  std::vector<char> bytes = ndtbl_test::read_file_bytes(path);
+  REQUIRE(bytes.size() > 55);
+  for (std::size_t index = 48; index < 56; ++index) {
+    bytes[index] = 0;
+  }
+  ndtbl_test::write_file_bytes(path, bytes);
+
+  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), ndtbl::FormatError);
 
   std::remove(path.c_str());
 }
@@ -446,7 +530,7 @@ TEST_CASE("typed loader rejects mismatched payload offsets", "[io]")
   }
   ndtbl_test::write_file_bytes(path, bytes);
 
-  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), std::runtime_error);
+  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), ndtbl::FormatError);
 
   std::remove(path.c_str());
 }

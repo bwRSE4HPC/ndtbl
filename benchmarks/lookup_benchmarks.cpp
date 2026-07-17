@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "ndtbl/ndtbl.hpp"
 
 #include <benchmark/benchmark.h>
@@ -200,7 +202,7 @@ make_queries(const std::array<ndtbl::Axis, Dim>& axes, std::size_t count)
   for (std::size_t query = 0; query < count; ++query) {
     std::array<double, Dim> coordinates = {};
     for (std::size_t axis = 0; axis < Dim; ++axis) {
-      const double fraction =
+      const auto fraction =
         static_cast<double>(((query + 17u * axis) % 997u) + 1u) / 998.0;
       coordinates[axis] =
         axes[axis].min() + fraction * (axes[axis].max() - axes[axis].min());

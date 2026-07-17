@@ -4,6 +4,7 @@
 
 #include "ndtbl/detail/binary_io.hpp"
 #include "ndtbl/detail/mapped_payload.hpp"
+#include "ndtbl/exceptions.hpp"
 #include "ndtbl/runtime_field_group.hpp"
 
 #include <array>
@@ -12,7 +13,6 @@
 #include <fstream>
 #include <memory>
 #include <ostream>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -29,7 +29,7 @@ namespace ndtbl {
  * @see write_group(const std::string&, const FieldGroup<Dim, Stored>&)
  */
 template<class Stored, std::size_t Dim>
-inline void
+void
 write_group_stream(std::ostream& os, const FieldGroup<Dim, Stored>& group)
 {
   detail::write_group_stream_impl(os, group);
@@ -50,7 +50,7 @@ write_group_stream(std::ostream& os, const FieldGroup<Dim, Stored>& group)
  * @see write_group_stream(std::ostream&, const FieldGroup<Dim, Stored>&)
  */
 template<class Stored>
-inline void
+void
 write_group_stream(std::ostream& os,
                    const GroupMetadata& metadata,
                    const std::vector<Stored>& interleaved_values)
@@ -68,12 +68,12 @@ write_group_stream(std::ostream& os,
  * @see write_group_stream(std::ostream&, const FieldGroup<Dim, Stored>&)
  */
 template<class Stored, std::size_t Dim>
-inline void
+void
 write_group(const std::string& path, const FieldGroup<Dim, Stored>& group)
 {
   std::ofstream os(path.c_str(), std::ios::binary);
   if (!os.is_open()) {
-    throw std::runtime_error("failed to open ndtbl output file: " + path);
+    throw IOError("failed to open ndtbl output file: " + path);
   }
   write_group_stream(os, group);
 }
@@ -90,14 +90,14 @@ write_group(const std::string& path, const FieldGroup<Dim, Stored>& group)
  *                         const std::vector<Stored>&)
  */
 template<class Stored>
-inline void
+void
 write_group(const std::string& path,
             const GroupMetadata& metadata,
             const std::vector<Stored>& interleaved_values)
 {
   std::ofstream os(path.c_str(), std::ios::binary);
   if (!os.is_open()) {
-    throw std::runtime_error("failed to open ndtbl output file: " + path);
+    throw IOError("failed to open ndtbl output file: " + path);
   }
   write_group_stream(os, metadata, interleaved_values);
 }
@@ -112,13 +112,13 @@ write_group(const std::string& path,
  * @see RuntimeFieldGroup
  */
 template<std::size_t Dim, class Output>
-inline void
+void
 write_group(const std::string& path,
             const RuntimeFieldGroup<Dim, Output>& group)
 {
   std::ofstream os(path.c_str(), std::ios::binary);
   if (!os.is_open()) {
-    throw std::runtime_error("failed to open ndtbl output file: " + path);
+    throw IOError("failed to open ndtbl output file: " + path);
   }
   group.write(os);
 }
@@ -139,7 +139,7 @@ read_group_metadata(const std::string& path)
 {
   std::ifstream is(path.c_str(), std::ios::binary);
   if (!is.is_open()) {
-    throw std::runtime_error("failed to open ndtbl input file: " + path);
+    throw IOError("failed to open ndtbl input file: " + path);
   }
 
   return detail::read_group_metadata_impl(is);
@@ -159,23 +159,21 @@ read_group_metadata(const std::string& path)
  * @see FieldGroup
  */
 template<std::size_t Dim, class Stored>
-inline FieldGroup<Dim, Stored>
+FieldGroup<Dim, Stored>
 read_field_group(const std::string& path)
 {
   std::ifstream is(path.c_str(), std::ios::binary);
   if (!is.is_open()) {
-    throw std::runtime_error("failed to open ndtbl input file: " + path);
+    throw IOError("failed to open ndtbl input file: " + path);
   }
 
   const detail::parsed_group_layout layout = detail::read_group_layout_impl(is);
   const GroupMetadata& metadata = layout.metadata;
   if (metadata.dimension != Dim) {
-    throw std::runtime_error(
-      "ndtbl file dimension does not match typed loader");
+    throw FormatError("ndtbl file dimension does not match typed loader");
   }
   if (metadata.value_type != scalar_type_of<Stored>()) {
-    throw std::runtime_error(
-      "ndtbl file scalar type does not match typed loader");
+    throw FormatError("ndtbl file scalar type does not match typed loader");
   }
 
   const std::array<Axis, Dim> axes = detail::fixed_axes<Dim>(metadata.axes);
@@ -192,8 +190,7 @@ read_field_group(const std::string& path)
 #else
   // Keep this non-const so the payload buffer can be moved into the read-only
   // FieldGroup storage instead of copied during load.
-  std::vector<Stored> values =
-    detail::read_payload<Stored>(is, layout.value_count);
+  auto values = detail::read_payload<Stored>(is, layout.value_count);
   return FieldGroup<Dim, Stored>(grid, metadata.field_names, std::move(values));
 #endif
 }
@@ -214,19 +211,18 @@ read_field_group(const std::string& path)
  * @see RuntimeFieldGroup
  */
 template<std::size_t Dim, class Output = double>
-inline RuntimeFieldGroup<Dim, Output>
+RuntimeFieldGroup<Dim, Output>
 read_runtime_field_group(const std::string& path)
 {
   std::ifstream is(path.c_str(), std::ios::binary);
   if (!is.is_open()) {
-    throw std::runtime_error("failed to open ndtbl input file: " + path);
+    throw IOError("failed to open ndtbl input file: " + path);
   }
 
   const detail::parsed_group_layout layout = detail::read_group_layout_impl(is);
   const GroupMetadata& metadata = layout.metadata;
   if (metadata.dimension != Dim) {
-    throw std::runtime_error(
-      "ndtbl file dimension does not match typed loader");
+    throw FormatError("ndtbl file dimension does not match typed loader");
   }
 
   const std::array<Axis, Dim> axes = detail::fixed_axes<Dim>(metadata.axes);
@@ -245,8 +241,7 @@ read_runtime_field_group(const std::string& path)
 #else
     // Keep this non-const so the payload buffer can be moved into the
     // read-only FieldGroup storage instead of copied during load.
-    std::vector<float> values =
-      detail::read_payload<float>(is, layout.value_count);
+    auto values = detail::read_payload<float>(is, layout.value_count);
     return RuntimeFieldGroup<Dim, Output>(
       FieldGroup<Dim, float>(grid, metadata.field_names, std::move(values)));
 #endif
@@ -266,14 +261,13 @@ read_runtime_field_group(const std::string& path)
 #else
     // Keep this non-const so the payload buffer can be moved into the
     // read-only FieldGroup storage instead of copied during load.
-    std::vector<double> values =
-      detail::read_payload<double>(is, layout.value_count);
+    auto values = detail::read_payload<double>(is, layout.value_count);
     return RuntimeFieldGroup<Dim, Output>(
       FieldGroup<Dim, double>(grid, metadata.field_names, std::move(values)));
 #endif
   }
 
-  throw std::runtime_error("unsupported ndtbl scalar type");
+  throw FormatError("unsupported ndtbl scalar type");
 }
 
 } // namespace ndtbl

@@ -145,7 +145,7 @@ public:
         return min_;
       }
 
-      const double fraction =
+      const auto fraction =
         static_cast<double>(index) / static_cast<double>(size_ - 1);
       return min_ + fraction * (max_ - min_);
     }
@@ -171,25 +171,6 @@ public:
     }
 
     return coordinates_;
-  }
-
-  /**
-   * @brief Check whether two axes describe the same grid support.
-   *
-   * @param other Axis to compare against.
-   * @return `true` if both axes represent the same support points.
-   */
-  bool equivalent(const Axis& other) const
-  {
-    if (kind_ != other.kind_ || size_ != other.size_) {
-      return false;
-    }
-
-    if (kind_ == axis_kind::uniform) {
-      return min_ == other.min_ && max_ == other.max_;
-    }
-
-    return coordinates_ == other.coordinates_;
   }
 
   /**
@@ -239,9 +220,9 @@ public:
       return std::make_pair(size_ - 2, 1.0);
     }
 
-    const std::vector<double>::const_iterator upper =
+    const auto upper =
       std::upper_bound(coordinates_.begin(), coordinates_.end(), value);
-    const std::size_t lower_index =
+    const auto lower_index =
       static_cast<std::size_t>(std::distance(coordinates_.begin(), upper) - 1);
     const double lower_value = coordinates_[lower_index];
     const double upper_value = coordinates_[lower_index + 1];

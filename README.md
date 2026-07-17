@@ -36,7 +36,6 @@ Use the Python package when you want a pip-installable Python interface for crea
 
 If you want to inspect `.ndtbl`files with a C++ command-line tool, use the C++ `ndtbl-inspect` executable built from `app/`. It is not prebuilt; it becomes available only after running the local CMake build.
 
-
 ## 📋 Prerequisites
 
 Building the C++ project requires:
@@ -140,6 +139,32 @@ dimensions, and may overshoot smooth-looking table data enough to produce
 unwanted values. Bounds handling is independent of interpolation order:
 queries outside the table domain can either clamp or throw according to the
 selected `bounds_policy`.
+
+## C++ Error Handling
+
+The C++ API distinguishes invalid table data, system I/O failures, and invalid
+object state through `ndtbl::FormatError`, `ndtbl::IOError`, and
+`ndtbl::StateError`. All three derive from `ndtbl::Error` and provide the
+standard `what()` message interface:
+
+```cpp
+try {
+  const auto group = ndtbl::read_runtime_field_group<2>(path);
+  // Use group.
+} catch (const ndtbl::FormatError& error) {
+  // The file is malformed, unsupported, truncated, or incompatible.
+} catch (const ndtbl::IOError& error) {
+  // Opening, reading, mapping, or another system operation failed.
+} catch (const ndtbl::StateError& error) {
+  // An operation required a populated runtime field group.
+} catch (const ndtbl::Error& error) {
+  // Any other ndtbl-specific runtime failure.
+}
+```
+
+Argument, bounds, and size failures continue to use the standard
+`std::invalid_argument`, `std::out_of_range`, and `std::overflow_error`
+categories.
 
 ## 🐍 Python Package
 

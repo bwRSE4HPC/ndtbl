@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "ndtbl/ndtbl.hpp"
 
 #include "test_support.hpp"
@@ -13,6 +15,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -174,6 +177,8 @@ static_assert(ndtbl::LinearStencil<4>::points == 16,
               "4D linear interpolation should use 16 table points");
 static_assert(ndtbl::CubicStencil<4>::points == 256,
               "4D cubic interpolation should use 256 table points");
+static_assert(!std::is_default_constructible<ndtbl::LinearStencil<4>>::value,
+              "interpolation stencils must be constructed by a grid");
 
 TEST_CASE("grid rejects shape products exceeding supported size",
           "[grid][validation]")
@@ -185,7 +190,7 @@ TEST_CASE("grid rejects shape products exceeding supported size",
     ndtbl::Axis::uniform(0.0, 1.0, huge_extent),
   };
 
-  REQUIRE_THROWS_AS(ndtbl::Grid<2>(axes), std::runtime_error);
+  REQUIRE_THROWS_AS(ndtbl::Grid<2>(axes), std::overflow_error);
 }
 
 TEST_CASE("field group rejects payload shape products exceeding supported size",
@@ -200,7 +205,7 @@ TEST_CASE("field group rejects payload shape products exceeding supported size",
 
   REQUIRE_THROWS_AS(
     (ndtbl::FieldGroup<1, double>(grid, { "A", "B" }, std::vector<double>())),
-    std::runtime_error);
+    std::overflow_error);
 }
 
 TEST_CASE("payload view keeps checked access separate from typed fast access",
@@ -223,9 +228,8 @@ TEST_CASE("field group evaluates unaligned byte-backed payloads",
   };
   const std::vector<double> payload = { 1.0, 3.0 };
 
-  std::shared_ptr<std::vector<std::uint8_t>> storage =
-    std::make_shared<std::vector<std::uint8_t>>(
-      payload.size() * sizeof(double) + 1u);
+  auto storage = std::make_shared<std::vector<std::uint8_t>>(
+    payload.size() * sizeof(double) + 1u);
   std::uint8_t* const unaligned_data = storage->data() + 1u;
   std::memcpy(unaligned_data, payload.data(), payload.size() * sizeof(double));
 
