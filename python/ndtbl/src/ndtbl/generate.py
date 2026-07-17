@@ -3,6 +3,7 @@ from typing import cast
 
 import numpy as np
 
+from ._binary import DOUBLE, MAGIC, UINT8, UINT16, UINT64
 from .model import (
     FieldGroup,
     FloatArray,
@@ -12,12 +13,12 @@ from .model import (
     normalize_dtype,
 )
 
-FILE_MAGIC_SIZE = 8
-HEADER_PREFIX_SIZE = 1 + 1 + 2 + 8
-DIMENSION_HEADER_SIZE = 8 * 3
-AXIS_HEADER_SIZE = 8 + 8
-UNIFORM_AXIS_PAYLOAD_SIZE = 16
-STRING_LENGTH_SIZE = 8
+FILE_MAGIC_SIZE = len(MAGIC)
+HEADER_PREFIX_SIZE = UINT8.size + UINT8.size + UINT16.size + UINT64.size
+DIMENSION_HEADER_SIZE = UINT64.size * 3
+AXIS_HEADER_SIZE = UINT8.size + UINT8.size + UINT16.size + UINT64.size
+UNIFORM_AXIS_PAYLOAD_SIZE = DOUBLE.size * 2
+STRING_LENGTH_SIZE = UINT64.size
 
 
 @dataclass(frozen=True, slots=True)

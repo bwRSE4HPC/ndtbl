@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from ndtbl import FieldGroup, UniformAxis
+from ndtbl._binary import serialized_group_size
 from ndtbl.generate import (
     LinearFieldSpec,
     estimate_generated_group_size,
@@ -141,3 +142,20 @@ def test_estimate_generated_group_size_scales_with_dtype() -> None:
         float64_estimate.estimated_file_bytes
         > float32_estimate.estimated_file_bytes
     )
+
+
+def test_estimate_generated_group_size_matches_serialized_size() -> None:
+    axes = (
+        UniformAxis(0.0, 1.0, 3),
+        UniformAxis(10.0, 20.0, 2),
+    )
+    field_specs = (
+        LinearFieldSpec("A", 1.0, (2.0, 0.0)),
+        LinearFieldSpec("B", 5.0, (0.0, -1.0)),
+    )
+    group = generate_group(axes, field_specs, dtype=np.float32)
+    estimate = estimate_generated_group_size(
+        axes, field_specs, dtype=np.float32
+    )
+
+    assert estimate.estimated_file_bytes == serialized_group_size(group)
