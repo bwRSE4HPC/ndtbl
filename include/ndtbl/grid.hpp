@@ -254,12 +254,15 @@ public:
     }
 
     LinearStencil<Dim> prepared;
-    for (std::size_t mask = 0; mask < LinearStencil<Dim>::points; ++mask) {
+    // Enumerate all corners of the bracketing cell. Bit `axis` selects the
+    // lower (0) or upper (1) endpoint on that axis.
+    for (std::size_t corner_mask = 0; corner_mask < LinearStencil<Dim>::points;
+         ++corner_mask) {
       double weight = 1.0;
       std::size_t linear_index = 0;
 
       for (std::size_t axis = 0; axis < Dim; ++axis) {
-        const bool use_upper = (mask & (std::size_t(1) << axis)) != 0;
+        const bool use_upper = (corner_mask & (std::size_t(1) << axis)) != 0;
         const std::size_t index =
           use_upper ? upper_indices[axis] : lower_indices[axis];
         const double axis_weight =
@@ -268,8 +271,8 @@ public:
         weight *= axis_weight;
       }
 
-      prepared.point_indices_[mask] = linear_index;
-      prepared.weights_[mask] = weight;
+      prepared.point_indices_[corner_mask] = linear_index;
+      prepared.weights_[corner_mask] = weight;
     }
 
     return prepared;
