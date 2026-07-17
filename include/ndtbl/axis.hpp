@@ -174,25 +174,6 @@ public:
   }
 
   /**
-   * @brief Check whether two axes describe the same grid support.
-   *
-   * @param other Axis to compare against.
-   * @return `true` if both axes represent the same support points.
-   */
-  bool equivalent(const Axis& other) const
-  {
-    if (kind_ != other.kind_ || size_ != other.size_) {
-      return false;
-    }
-
-    if (kind_ == axis_kind::uniform) {
-      return min_ == other.min_ && max_ == other.max_;
-    }
-
-    return coordinates_ == other.coordinates_;
-  }
-
-  /**
    * @brief Locate the interpolation interval and upper weight for a query.
    *
    * Values outside the axis range are clamped to the nearest interval endpoint

@@ -225,22 +225,6 @@ public:
   std::size_t point_count() const { return point_count_; }
 
   /**
-   * @brief Check whether another grid uses the same axes.
-   *
-   * @param other Grid to compare against.
-   * @return `true` if all axes are equivalent.
-   */
-  bool equivalent(const Grid& other) const
-  {
-    for (std::size_t axis = 0; axis < Dim; ++axis) {
-      if (!axes_[axis].equivalent(other.axes_[axis])) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
    * @brief Precompute the multilinear interpolation stencil for one query
    * point.
    *
