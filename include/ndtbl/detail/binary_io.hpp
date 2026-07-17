@@ -205,8 +205,14 @@ require_zero(std::uint64_t value, const std::string& what)
 constexpr std::size_t
 fixed_header_size()
 {
-  return sizeof(file_magic) + sizeof(std::uint8_t) + sizeof(std::uint8_t) +
-         sizeof(std::uint16_t) + sizeof(std::uint64_t) * 4u;
+  return sizeof(file_magic) +    // File magic
+         sizeof(std::uint8_t) +  // Format version
+         sizeof(std::uint8_t) +  // Scalar type
+         sizeof(std::uint16_t) + // Reserved
+         sizeof(std::uint64_t) + // Payload offset
+         sizeof(std::uint64_t) + // Dimension
+         sizeof(std::uint64_t) + // Field count
+         sizeof(std::uint64_t);  // Point count
 }
 
 inline std::size_t
@@ -216,22 +222,31 @@ metadata_size(const GroupMetadata& metadata)
 
   for (const auto& axis_spec : metadata.axes) {
     total = checked_add_size(total,
-                             sizeof(std::uint8_t) + sizeof(std::uint8_t) +
-                               sizeof(std::uint16_t) + sizeof(std::uint64_t),
+                             sizeof(std::uint8_t) +    // Axis kind
+                               sizeof(std::uint8_t) +  // Reserved byte
+                               sizeof(std::uint16_t) + // Reserved field
+                               sizeof(std::uint64_t),  // Axis extent
                              "metadata size");
 
     if (axis_spec.kind() == axis_kind::uniform) {
-      total = checked_add_size(total, sizeof(double) * 2u, "metadata size");
+      total = checked_add_size(total,
+                               sizeof(double) +  // Minimum coordinate
+                                 sizeof(double), // Maximum coordinate
+                               "metadata size");
     } else {
       total = checked_add_size(
         total,
-        checked_multiply_size(axis_spec.size(), sizeof(double), "axis payload"),
+        checked_multiply_size(axis_spec.size(),
+                              sizeof(double), // Axis coordinate
+                              "axis payload"),
         "metadata size");
     }
   }
 
   for (const auto& field_name : metadata.field_names) {
-    total = checked_add_size(total, sizeof(std::uint64_t), "metadata size");
+    total = checked_add_size(total,
+                             sizeof(std::uint64_t), // Field name length
+                             "metadata size");
     total = checked_add_size(total, field_name.size(), "metadata size");
   }
 
