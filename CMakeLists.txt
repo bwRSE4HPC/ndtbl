@@ -70,7 +70,7 @@ target_sources(ndtbl
       include/ndtbl/detail/mapped_payload.hpp
 )
 
-# Compile flag for enabling mmap support
+# Compile flags for enabling mmap support and related features
 target_compile_definitions(ndtbl
   INTERFACE
     NDTBL_ENABLE_MMAP=$<BOOL:${ndtbl_ENABLE_MMAP}>

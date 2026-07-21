@@ -5,6 +5,7 @@ abstract: "Multidimensional table lookup library for C++."
 authors:
   - family-names: Isensee
     given-names: Thomas
+    affiliation: "Scientific Software Center (SSC), Interdisciplinary Center for Scientific Computing (IWR), Heidelberg University, Germany"
     orcid: "https://orcid.org/0000-0002-7242-4529"
 keywords:
   - "table lookup"
