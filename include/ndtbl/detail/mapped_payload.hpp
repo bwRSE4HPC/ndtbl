@@ -18,24 +18,27 @@
 #include "ndtbl/exceptions.hpp"
 
 #include <cstddef>
+
+#if NDTBL_ENABLE_MMAP
+#include <cerrno>
 #include <cstdint>
-#include <cstdio>
-#include <fstream>
-#include <limits>
+#include <cstring>
 #include <memory>
-#include <sstream>
 #include <stdexcept>
 #include <string>
-#include <vector>
-
-#if NDTBL_ENABLE_MMAP || NDTBL_ENABLE_MMAP_DIAGNOSTICS
-#include <cerrno>
-#include <cstring>
 
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
+
+#if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+#include <cstdio>
+#include <fstream>
+#include <limits>
+#include <sstream>
+#include <vector>
 #endif
 
 #if NDTBL_ENABLE_MMAP_DIAGNOSTICS
@@ -65,7 +68,7 @@ unavailable_residency()
   return residency_info{};
 }
 
-#if NDTBL_ENABLE_MMAP || NDTBL_ENABLE_MMAP_DIAGNOSTICS
+#if NDTBL_ENABLE_MMAP
 
 inline std::string
 system_error_message(const std::string& prefix)
