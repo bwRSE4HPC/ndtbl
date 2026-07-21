@@ -65,9 +65,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v7
 
-    - name: Install Doxygen
-      uses: ssciwr/doxygen-install@v2
-
     - name: Configure cmake
       shell: bash
       run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -Dndtbl_BUILD_TESTING=ON -Dndtbl_BUILD_DOCS=OFF -Dndtbl_ENABLE_MMAP=${{ matrix.mmap }}
@@ -94,9 +91,6 @@ jobs:
     - name: Install LCov
       run: |
         sudo apt-get install -y lcov
-
-    - name: Install Doxygen
-      uses: ssciwr/doxygen-install@v2
 
     - name: Configure cmake
       shell: bash
