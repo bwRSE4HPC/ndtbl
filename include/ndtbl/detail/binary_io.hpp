@@ -94,11 +94,11 @@ write_uint_le(std::ostream& os, UInt value)
   static_assert(std::is_unsigned<UInt>::value,
                 "write_uint_le requires an unsigned integer type");
 
-  char bytes[sizeof(UInt)] = {};
-  for (std::size_t index = 0; index < sizeof(UInt); ++index) {
+  std::array<char, sizeof(UInt)> bytes = {};
+  for (std::size_t index = 0; index < bytes.size(); ++index) {
     bytes[index] = static_cast<char>((value >> (index * 8u)) & 0xffu);
   }
-  write_bytes(os, bytes, sizeof(bytes));
+  write_bytes(os, bytes.data(), bytes.size());
 }
 
 template<class UInt>
@@ -108,11 +108,11 @@ read_uint_le(std::istream& is)
   static_assert(std::is_unsigned<UInt>::value,
                 "read_uint_le requires an unsigned integer type");
 
-  char bytes[sizeof(UInt)] = {};
-  read_bytes(is, bytes, sizeof(bytes));
+  std::array<char, sizeof(UInt)> bytes = {};
+  read_bytes(is, bytes.data(), bytes.size());
 
   UInt value = 0;
-  for (std::size_t index = 0; index < sizeof(UInt); ++index) {
+  for (std::size_t index = 0; index < bytes.size(); ++index) {
     value |= static_cast<UInt>(static_cast<unsigned char>(bytes[index]))
              << (index * 8u);
   }
