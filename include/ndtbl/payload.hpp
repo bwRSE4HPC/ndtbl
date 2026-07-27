@@ -28,7 +28,6 @@ public:
    */
   PayloadView()
     : data_(nullptr)
-    , typed_data_(nullptr)
     , size_(0)
   {
   }
@@ -41,7 +40,6 @@ public:
    */
   PayloadView(const std::uint8_t* data, std::size_t size)
     : data_(data)
-    , typed_data_(nullptr)
     , size_(size)
   {
   }
@@ -123,7 +121,7 @@ public:
 
 private:
   const std::uint8_t* data_;
-  const Stored* typed_data_;
+  const Stored* typed_data_ = nullptr;
   std::size_t size_;
 };
 

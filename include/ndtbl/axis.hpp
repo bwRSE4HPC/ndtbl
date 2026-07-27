@@ -26,13 +26,7 @@ public:
   /**
    * @brief Construct a single-point uniform axis at coordinate zero.
    */
-  Axis()
-    : kind_(axis_kind::uniform)
-    , size_(1)
-    , min_(0.0)
-    , max_(0.0)
-  {
-  }
+  Axis() = default;
 
   /**
    * @brief Construct a uniformly spaced axis.
@@ -231,10 +225,10 @@ public:
   }
 
 private:
-  axis_kind kind_;
-  std::size_t size_;
-  double min_;
-  double max_;
+  axis_kind kind_ = axis_kind::uniform;
+  std::size_t size_ = 1;
+  double min_ = 0.0;
+  double max_ = 0.0;
   std::vector<double> coordinates_;
 };
 

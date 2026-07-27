@@ -29,8 +29,9 @@ namespace detail {
  * This constant is part of the binary file format implementation and is not
  * intended to be consumed directly by library users.
  */
-static constexpr char file_magic[8] = { 'N', 'D',  'T',  'B',
-                                        'L', '\0', '\0', '\0' };
+static constexpr std::array<char, 8> file_magic = {
+  { 'N', 'D', 'T', 'B', 'L', '\0', '\0', '\0' }
+};
 
 /**
  * @brief Write one exact byte sequence to a binary stream.
@@ -93,11 +94,12 @@ write_uint_le(std::ostream& os, UInt value)
   static_assert(std::is_unsigned<UInt>::value,
                 "write_uint_le requires an unsigned integer type");
 
-  char bytes[sizeof(UInt)] = {};
-  for (std::size_t index = 0; index < sizeof(UInt); ++index) {
-    bytes[index] = static_cast<char>((value >> (index * 8u)) & 0xffu);
+  std::array<char, sizeof(UInt)> bytes = {};
+  for (auto& byte : bytes) {
+    byte = static_cast<char>(value & 0xffu);
+    value >>= 8u;
   }
-  write_bytes(os, bytes, sizeof(bytes));
+  write_bytes(os, bytes.data(), bytes.size());
 }
 
 template<class UInt>
@@ -107,11 +109,11 @@ read_uint_le(std::istream& is)
   static_assert(std::is_unsigned<UInt>::value,
                 "read_uint_le requires an unsigned integer type");
 
-  char bytes[sizeof(UInt)] = {};
-  read_bytes(is, bytes, sizeof(bytes));
+  std::array<char, sizeof(UInt)> bytes = {};
+  read_bytes(is, bytes.data(), bytes.size());
 
   UInt value = 0;
-  for (std::size_t index = 0; index < sizeof(UInt); ++index) {
+  for (std::size_t index = 0; index < bytes.size(); ++index) {
     value |= static_cast<UInt>(static_cast<unsigned char>(bytes[index]))
              << (index * 8u);
   }
@@ -205,7 +207,7 @@ require_zero(std::uint64_t value, const std::string& what)
 constexpr std::size_t
 fixed_header_size()
 {
-  return sizeof(file_magic) +    // File magic
+  return file_magic.size() +     // File magic
          sizeof(std::uint8_t) +  // Format version
          sizeof(std::uint8_t) +  // Scalar type
          sizeof(std::uint16_t) + // Reserved
@@ -306,7 +308,7 @@ write_group_stream_impl(std::ostream& os,
 
   const std::size_t payload_offset = metadata_size(metadata);
 
-  write_bytes(os, file_magic, sizeof(file_magic));
+  write_bytes(os, file_magic.data(), file_magic.size());
   write_uint_le<std::uint8_t>(os, current_format_version);
   write_uint_le<std::uint8_t>(os,
                               static_cast<std::uint8_t>(metadata.value_type));
@@ -396,9 +398,9 @@ write_group_stream_impl(std::ostream& os,
 inline void
 verify_magic(std::istream& is)
 {
-  char magic[sizeof(file_magic)] = {};
-  read_bytes(is, magic, sizeof(magic));
-  if (!std::equal(magic, magic + sizeof(file_magic), file_magic)) {
+  std::array<char, file_magic.size()> magic = {};
+  read_bytes(is, magic.data(), magic.size());
+  if (magic != file_magic) {
     throw FormatError("invalid ndtbl magic header");
   }
 }
@@ -490,7 +492,7 @@ read_group_layout_impl(std::istream& is)
     throw FormatError("ndtbl point count does not match axis extents");
   }
 
-  std::istream::pos_type payload_position = std::istream::pos_type(-1);
+  auto payload_position = std::istream::pos_type(-1);
   try {
     payload_position = is.tellg();
   } catch (const std::ios_base::failure&) {
