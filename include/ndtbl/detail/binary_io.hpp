@@ -29,8 +29,9 @@ namespace detail {
  * This constant is part of the binary file format implementation and is not
  * intended to be consumed directly by library users.
  */
-static constexpr char file_magic[8] = { 'N', 'D',  'T',  'B',
-                                        'L', '\0', '\0', '\0' };
+static constexpr std::array<char, 8> file_magic = {
+  { 'N', 'D', 'T', 'B', 'L', '\0', '\0', '\0' }
+};
 
 /**
  * @brief Write one exact byte sequence to a binary stream.
@@ -205,7 +206,7 @@ require_zero(std::uint64_t value, const std::string& what)
 constexpr std::size_t
 fixed_header_size()
 {
-  return sizeof(file_magic) +    // File magic
+  return file_magic.size() +     // File magic
          sizeof(std::uint8_t) +  // Format version
          sizeof(std::uint8_t) +  // Scalar type
          sizeof(std::uint16_t) + // Reserved
@@ -306,7 +307,7 @@ write_group_stream_impl(std::ostream& os,
 
   const std::size_t payload_offset = metadata_size(metadata);
 
-  write_bytes(os, file_magic, sizeof(file_magic));
+  write_bytes(os, file_magic.data(), file_magic.size());
   write_uint_le<std::uint8_t>(os, current_format_version);
   write_uint_le<std::uint8_t>(os,
                               static_cast<std::uint8_t>(metadata.value_type));
@@ -396,9 +397,9 @@ write_group_stream_impl(std::ostream& os,
 inline void
 verify_magic(std::istream& is)
 {
-  char magic[sizeof(file_magic)] = {};
-  read_bytes(is, magic, sizeof(magic));
-  if (!std::equal(magic, magic + sizeof(file_magic), file_magic)) {
+  std::array<char, file_magic.size()> magic = {};
+  read_bytes(is, magic.data(), magic.size());
+  if (magic != file_magic) {
     throw FormatError("invalid ndtbl magic header");
   }
 }
