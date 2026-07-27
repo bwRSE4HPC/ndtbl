@@ -147,8 +147,8 @@ public:
    * placeholder before assigning a fully constructed grid.
    */
   Grid()
+    : point_count_(0)
   {
-    point_count_ = 0;
     extents_.fill(0);
     strides_.fill(0);
   }
@@ -159,9 +159,9 @@ public:
    * @param axes Axis descriptors in dimension order.
    */
   explicit Grid(const std::array<Axis, Dim>& axes)
-    : axes_(axes)
+    : point_count_(1)
+    , axes_(axes)
   {
-    point_count_ = 1;
     strides_[Dim - 1] = 1;
     for (std::size_t axis = Dim; axis-- > 0;) {
       extents_[axis] = axes_[axis].size();
