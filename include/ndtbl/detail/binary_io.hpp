@@ -491,7 +491,7 @@ read_group_layout_impl(std::istream& is)
     throw FormatError("ndtbl point count does not match axis extents");
   }
 
-  std::istream::pos_type payload_position = std::istream::pos_type(-1);
+  auto payload_position = std::istream::pos_type(-1);
   try {
     payload_position = is.tellg();
   } catch (const std::ios_base::failure&) {
