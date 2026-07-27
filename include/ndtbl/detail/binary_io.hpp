@@ -95,8 +95,9 @@ write_uint_le(std::ostream& os, UInt value)
                 "write_uint_le requires an unsigned integer type");
 
   std::array<char, sizeof(UInt)> bytes = {};
-  for (std::size_t index = 0; index < bytes.size(); ++index) {
-    bytes[index] = static_cast<char>((value >> (index * 8u)) & 0xffu);
+  for (auto& byte : bytes) {
+    byte = static_cast<char>(value & 0xffu);
+    value >>= 8u;
   }
   write_bytes(os, bytes.data(), bytes.size());
 }
