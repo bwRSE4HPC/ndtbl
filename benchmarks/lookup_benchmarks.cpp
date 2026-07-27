@@ -5,6 +5,7 @@
 #include <benchmark/benchmark.h>
 
 #include <array>
+#include <cmath>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -116,7 +117,7 @@ make_axes(const std::array<std::size_t, Dim>& shape, ndtbl::axis_kind axis_kind)
             ? 0.0
             : static_cast<double>(index) / static_cast<double>(shape[axis] - 1);
         const double curved = fraction * fraction;
-        coordinates[index] = min_value + curved * (max_value - min_value);
+        coordinates[index] = std::lerp(min_value, max_value, curved);
       }
       axes[axis] = ndtbl::Axis::from_coordinates(coordinates);
     }
