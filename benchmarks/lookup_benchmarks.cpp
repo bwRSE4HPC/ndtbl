@@ -7,6 +7,7 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <format>
 #include <string>
 #include <vector>
 
@@ -139,7 +140,7 @@ make_field_names(std::size_t field_count)
   std::vector<std::string> names;
   names.reserve(field_count);
   for (std::size_t field = 0; field < field_count; ++field) {
-    names.push_back("field" + std::to_string(field));
+    names.push_back(std::format("field{}", field));
   }
   return names;
 }
