@@ -39,7 +39,7 @@ public:
   /**
    * @brief Construct an empty runtime-erased group handle.
    */
-  RuntimeFieldGroup() {}
+  RuntimeFieldGroup() = default;
 
   /**
    * @brief Construct a runtime-erased wrapper from a typed field group.
@@ -236,7 +236,7 @@ public:
 private:
   struct Concept
   {
-    virtual ~Concept() {}
+    virtual ~Concept() = default;
     virtual std::size_t field_count() const = 0;
     virtual scalar_type value_type() const = 0;
     virtual std::vector<std::string> field_names() const = 0;
