@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 namespace ndtbl {
@@ -15,33 +16,36 @@ namespace ndtbl {
  *
  * The payload is addressed in logical `Stored` elements, but is stored as bytes
  * internally so the view remains valid for both aligned heap-backed storage and
- * potentially unaligned file-backed memory mappings.
+ * potentially unaligned file-backed memory mappings. The view does not own the
+ * referenced storage, which must remain alive for the lifetime of the view.
  *
- * @tparam Stored Scalar payload type addressed through the view.
+ * @tparam Stored Trivially copyable scalar payload type addressed through the
+ *                view.
  */
 template<class Stored>
 class PayloadView
 {
+  static_assert(std::is_trivially_copyable<Stored>::value,
+                "ndtbl payload elements must be trivially copyable");
+
 public:
   /**
    * @brief Construct an empty payload view.
    */
-  PayloadView()
-    : data_(nullptr)
-    , size_(0)
-  {
-  }
+  PayloadView() = default;
 
   /**
    * @brief Construct a payload view from raw bytes.
    *
    * @param data Pointer to the first payload byte.
    * @param size Number of logical `Stored` entries in the payload.
+   * @throws std::invalid_argument If `data` is null and `size` is nonzero.
    */
   PayloadView(const std::uint8_t* data, std::size_t size)
     : data_(data)
     , size_(size)
   {
+    validate_data();
   }
 
   /**
@@ -49,6 +53,7 @@ public:
    *
    * @param data Pointer to the first typed payload value.
    * @param size Number of logical `Stored` entries in the payload.
+   * @throws std::invalid_argument If `data` is null and `size` is nonzero.
    */
   PayloadView(const Stored* data, std::size_t size)
     : data_(data == nullptr ? nullptr
@@ -56,6 +61,7 @@ public:
     , typed_data_(data)
     , size_(size)
   {
+    validate_data();
   }
 
   /**
@@ -120,9 +126,16 @@ public:
   }
 
 private:
-  const std::uint8_t* data_;
+  void validate_data() const
+  {
+    if (data_ == nullptr && size_ != 0) {
+      throw std::invalid_argument("non-empty ndtbl payload has null data");
+    }
+  }
+
+  const std::uint8_t* data_ = nullptr;
   const Stored* typed_data_ = nullptr;
-  std::size_t size_;
+  std::size_t size_ = 0;
 };
 
 /**
@@ -131,6 +144,9 @@ private:
  * @tparam Stored Scalar payload type stored in the vector.
  * @param values Contiguous payload storage to view.
  * @return Read-only view into `values`.
+ *
+ * The vector must remain alive and must not reallocate while the returned view
+ * is in use. Rvalue vectors are rejected to prevent immediately dangling views.
  */
 template<class Stored>
 PayloadView<Stored>
@@ -139,5 +155,9 @@ payload_view(const std::vector<Stored>& values)
   const Stored* data = values.empty() ? nullptr : values.data();
   return PayloadView<Stored>(data, values.size());
 }
+
+template<class Stored>
+PayloadView<Stored>
+payload_view(const std::vector<Stored>&&) = delete;
 
 } // namespace ndtbl
