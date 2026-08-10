@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -171,6 +172,16 @@ cubic_2d(double x, double y)
          0.5 * x * x + 0.75 * y * y * y - 0.125 * x * x * x * y;
 }
 
+template<class Vector, class = void>
+struct can_make_payload_view : std::false_type
+{};
+
+template<class Vector>
+struct can_make_payload_view<Vector,
+                             decltype(void(ndtbl::payload_view(
+                               std::declval<Vector>())))> : std::true_type
+{};
+
 } // namespace
 
 static_assert(ndtbl::LinearStencil<4>::points == 16,
@@ -179,6 +190,18 @@ static_assert(ndtbl::CubicStencil<4>::points == 256,
               "4D cubic interpolation should use 256 table points");
 static_assert(!std::is_default_constructible<ndtbl::LinearStencil<4>>::value,
               "interpolation stencils must be constructed by a grid");
+static_assert(std::is_copy_constructible<ndtbl::PayloadView<double>>::value,
+              "payload views must remain copy constructible");
+static_assert(std::is_copy_assignable<ndtbl::PayloadView<double>>::value,
+              "payload views must remain copy assignable");
+static_assert(std::is_move_constructible<ndtbl::PayloadView<double>>::value,
+              "payload views must remain move constructible");
+static_assert(std::is_move_assignable<ndtbl::PayloadView<double>>::value,
+              "payload views must remain move assignable");
+static_assert(can_make_payload_view<std::vector<double>&>::value,
+              "payload_view must accept vector lvalues");
+static_assert(!can_make_payload_view<std::vector<double>&&>::value,
+              "payload_view must reject vector rvalues");
 
 TEST_CASE("grid rejects shape products exceeding supported size",
           "[grid][validation]")
@@ -218,6 +241,47 @@ TEST_CASE("payload view keeps checked access separate from typed fast access",
   REQUIRE(view.at(1) == Catch::Approx(2.0));
   REQUIRE(view.unchecked(2) == Catch::Approx(3.0));
   REQUIRE_THROWS_AS(view.at(payload.size()), std::out_of_range);
+}
+
+TEST_CASE("payload view has safe value semantics", "[payload]")
+{
+  const ndtbl::PayloadView<double> empty;
+  REQUIRE(empty.size() == 0);
+  REQUIRE(empty.byte_size() == 0);
+  REQUIRE(empty.byte_data() == nullptr);
+  REQUIRE(empty.typed_data() == nullptr);
+
+  const std::vector<double> payload = { 1.0, 2.0, 3.0 };
+  const ndtbl::PayloadView<double> view = ndtbl::payload_view(payload);
+
+  ndtbl::PayloadView<double> copied(view);
+  ndtbl::PayloadView<double> copy_assigned;
+  copy_assigned = view;
+  ndtbl::PayloadView<double> moved(std::move(copied));
+  ndtbl::PayloadView<double> move_assigned;
+  move_assigned = std::move(copy_assigned);
+
+  REQUIRE(moved.byte_data() == view.byte_data());
+  REQUIRE(moved.typed_data() == view.typed_data());
+  REQUIRE(moved.size() == view.size());
+  REQUIRE(moved.at(1) == Catch::Approx(2.0));
+  REQUIRE(move_assigned.byte_data() == view.byte_data());
+  REQUIRE(move_assigned.typed_data() == view.typed_data());
+  REQUIRE(move_assigned.size() == view.size());
+  REQUIRE(move_assigned.at(2) == Catch::Approx(3.0));
+}
+
+TEST_CASE("payload view rejects null data for a non-empty view", "[payload]")
+{
+  const auto* const bytes = static_cast<const std::uint8_t*>(nullptr);
+  const auto* const values = static_cast<const double*>(nullptr);
+
+  REQUIRE_NOTHROW(ndtbl::PayloadView<double>(bytes, 0));
+  REQUIRE_NOTHROW(ndtbl::PayloadView<double>(values, 0));
+  REQUIRE_THROWS_AS(ndtbl::PayloadView<double>(bytes, 1),
+                    std::invalid_argument);
+  REQUIRE_THROWS_AS(ndtbl::PayloadView<double>(values, 1),
+                    std::invalid_argument);
 }
 
 TEST_CASE("field group evaluates unaligned byte-backed payloads",

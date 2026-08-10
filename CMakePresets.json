@@ -1,0 +1,87 @@
+{
+  "version": 8,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 28,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": true,
+        "ndtbl_BUILD_BENCHMARKS": false,
+        "ndtbl_BUILD_DOCS": false,
+        "ndtbl_BUILD_TESTING": false
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "description": "Debug build of ndtbl",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "description": "Optimized release build of ndtbl",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "test",
+      "displayName": "Debug with tests",
+      "description": "Debug build with the C++ test suite enabled",
+      "inherits": "debug",
+      "cacheVariables": {
+        "ndtbl_BUILD_TESTING": true
+      }
+    },
+    {
+      "name": "benchmark",
+      "displayName": "Release with benchmarks",
+      "description": "Release build with Google Benchmark enabled",
+      "inherits": "release",
+      "cacheVariables": {
+        "ndtbl_BUILD_BENCHMARKS": true
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release"
+    },
+    {
+      "name": "test",
+      "configurePreset": "test"
+    },
+    {
+      "name": "benchmark",
+      "configurePreset": "benchmark",
+      "targets": [
+        "ndtbl_lookup_benchmarks"
+      ]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "test",
+      "configurePreset": "test",
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}

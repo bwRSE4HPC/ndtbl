@@ -39,6 +39,7 @@ jobs:
             - 'src/**'
             - 'tests/**'
             - 'CMakeLists.txt'
+            - 'CMakePresets.json'
           python:
             - 'python/**'
 
@@ -65,18 +66,17 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v7
 
-    - name: Configure cmake
+    - name: Configure CMake
       shell: bash
-      run: cmake -B build -DCMAKE_BUILD_TYPE=Debug -Dndtbl_BUILD_TESTING=ON -Dndtbl_BUILD_DOCS=OFF -Dndtbl_ENABLE_MMAP=${{ matrix.mmap }}
+      run: cmake --preset test -Dndtbl_ENABLE_MMAP=${{ matrix.mmap }}
 
     - name: Build
       shell: bash
-      run: cmake --build build
+      run: cmake --build --preset test
 
     - name: Run tests
       shell: bash
-      working-directory: ${{ github.workspace }}/build
-      run: ctest --output-on-failure
+      run: ctest --preset test
 
   coverage-test-cpp:
     name: Coverage Testing C++
@@ -92,24 +92,21 @@ jobs:
       run: |
         sudo apt-get install -y lcov
 
-    - name: Configure cmake
+    - name: Configure CMake
       shell: bash
       run: |
-        cmake -B build \
-          -DCMAKE_BUILD_TYPE=Debug \
+        cmake \
+          --preset test \
           -DCMAKE_CXX_FLAGS="--coverage -fprofile-update=atomic -O0 -g" \
-          -DCMAKE_EXE_LINKER_FLAGS="--coverage" \
-          -Dndtbl_BUILD_TESTING=ON \
-          -Dndtbl_BUILD_DOCS=OFF
+          -DCMAKE_EXE_LINKER_FLAGS="--coverage"
 
     - name: Build
       shell: bash
-      run: cmake --build build
+      run: cmake --build --preset test
 
     - name: Run tests
       shell: bash
-      working-directory: ${{ github.workspace }}/build
-      run: ctest --output-on-failure
+      run: ctest --preset test
 
     - name: Collect coverage report
       shell: bash
