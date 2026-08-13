@@ -1,3 +1,4 @@
+import logging
 import struct
 
 import numpy as np
@@ -61,6 +62,54 @@ def test_read_metadata_returns_expected_summary(
     assert metadata.point_count == 6
     assert metadata.field_names == ("A", "B")
     assert metadata.dtype == np.dtype(np.float64)
+
+
+def test_public_io_operations_log_debug_summaries(
+    caplog,
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "logged.ndtbl"
+
+    with caplog.at_level(logging.DEBUG, logger="ndtbl.io"):
+        write_group(path, sample_uniform_group)
+        read_metadata(path)
+        read_group(path)
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any(
+        message.startswith(f"Writing ndtbl group to {path}:")
+        and "dimension=2, points=6, fields=2, dtype=float64" in message
+        and "size=" in message
+        for message in messages
+    )
+    assert f"Wrote ndtbl group to {path}" in messages
+    assert any(
+        message.startswith(f"Read ndtbl metadata from {path}:")
+        and "dimension=2, points=6, fields=2, dtype=float64" in message
+        for message in messages
+    )
+    assert any(
+        message.startswith(f"Read ndtbl group from {path}:")
+        and "dimension=2, points=6, fields=2, dtype=float64" in message
+        for message in messages
+    )
+
+
+def test_public_io_operations_are_silent_by_default(
+    capsys,
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "silent.ndtbl"
+
+    write_group(path, sample_uniform_group)
+    read_metadata(path)
+    read_group(path)
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
 
 
 def test_read_group_preserves_point_major_storage_order(tmp_path) -> None:

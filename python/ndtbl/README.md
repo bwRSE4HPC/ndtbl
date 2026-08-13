@@ -76,6 +76,18 @@ print(loaded.values[1, 0, :])
 `write_group` refuses to write files larger than 128 MiB by default. Pass
 `max_size_mib=...` when a larger output is intentional.
 
+The library uses standard Python logging and stays silent unless the calling
+application configures it. Enable ndtbl diagnostics with:
+
+```python
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logging.getLogger("ndtbl").setLevel(logging.DEBUG)
+```
+
+Diagnostics use the `ndtbl` logger hierarchy and never include payload values.
+
 The `values` array shape is `axis_0 x axis_1 x ... x field`.
 
 ### Demo notebook
@@ -94,6 +106,13 @@ Show the top-level help:
 
 ```bash
 ndtbl --help
+```
+
+Add `--verbose` (or `-v`) before the subcommand to write debug diagnostics to
+standard error while keeping command results on standard output:
+
+```bash
+ndtbl --verbose inspect example.ndtbl
 ```
 
 ### `inspect`

@@ -46,6 +46,56 @@ def test_inspect_no_banner_suppresses_ascii_header(
     assert "samples: 5" in result.output
 
 
+def test_verbose_inspect_logs_diagnostics_to_stderr(
+    runner,
+    tmp_path,
+    sample_uniform_group,
+) -> None:
+    path = tmp_path / "inspect-verbose.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    result = runner.invoke(
+        main, ["--verbose", "inspect", str(path), "--no-banner"]
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout.startswith(f"file: {path}\n")
+    assert "DEBUG ndtbl.io: Reading ndtbl group from" in result.stderr
+    assert f"Read ndtbl group from {path}:" in result.stderr
+    assert "DEBUG ndtbl.io:" not in result.stdout
+
+
+def test_verbose_logging_does_not_leak_into_later_invocations(
+    runner,
+    tmp_path,
+    sample_uniform_group,
+) -> None:
+    path = tmp_path / "inspect-after-verbose.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    verbose_result = runner.invoke(
+        main, ["--verbose", "inspect", str(path), "--no-banner"]
+    )
+    result = runner.invoke(main, ["inspect", str(path), "--no-banner"])
+
+    assert verbose_result.exit_code == 0
+    assert result.exit_code == 0
+    assert result.stderr == ""
+    assert "DEBUG ndtbl.io:" not in result.output
+
+
+def test_verbose_failure_is_not_also_logged_as_error(runner, tmp_path) -> None:
+    path = tmp_path / "invalid-verbose.ndtbl"
+    path.write_bytes(b"not an ndtbl file")
+
+    result = runner.invoke(main, ["--verbose", "inspect", str(path)])
+
+    assert result.exit_code != 0
+    assert str(result.exception) == "invalid ndtbl magic header"
+    assert result.stderr.count("Reading ndtbl group from") == 1
+    assert "ERROR ndtbl.io:" not in result.stderr
+
+
 def test_inspect_short_samples_option_limits_output(
     runner,
     tmp_path,

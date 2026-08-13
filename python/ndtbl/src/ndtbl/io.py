@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from ._binary import (
@@ -9,6 +10,8 @@ from ._binary import (
     write_group_to_stream,
 )
 from .model import FieldGroup, GroupMetadata
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_SIZE_MIB = 128.0
 _BYTES_PER_MIB = 1024 * 1024
@@ -61,8 +64,21 @@ def read_metadata(path: str | Path) -> GroupMetadata:
         The parsed group metadata.
     """
 
+    path = Path(path)
+    logger.debug("Reading ndtbl metadata from %s", path)
     with open_for_read(path) as stream:
-        return read_metadata_from_stream(stream)
+        group_metadata = read_metadata_from_stream(stream)
+
+    logger.debug(
+        "Read ndtbl metadata from %s: dimension=%d, points=%d, "
+        "fields=%d, dtype=%s",
+        path,
+        group_metadata.dimension,
+        group_metadata.point_count,
+        group_metadata.field_count,
+        group_metadata.dtype_name,
+    )
+    return group_metadata
 
 
 def read_group(path: str | Path) -> FieldGroup:
@@ -75,8 +91,21 @@ def read_group(path: str | Path) -> FieldGroup:
         The parsed field group including payload values.
     """
 
+    path = Path(path)
+    logger.debug("Reading ndtbl group from %s", path)
     with open_for_read(path) as stream:
-        return read_group_from_stream(stream)
+        group = read_group_from_stream(stream)
+
+    logger.debug(
+        "Read ndtbl group from %s: dimension=%d, points=%d, "
+        "fields=%d, dtype=%s",
+        path,
+        group.dimension,
+        group.point_count,
+        group.field_count,
+        group.dtype_name,
+    )
+    return group
 
 
 def write_group(
@@ -93,10 +122,19 @@ def write_group(
         max_size_mib: Maximum serialized file size allowed before writing.
     """
 
-    _enforce_file_size_limit(
-        serialized_group_size(group),
-        group,
-        max_size_mib,
+    path = Path(path)
+    serialized_bytes = serialized_group_size(group)
+    _enforce_file_size_limit(serialized_bytes, group, max_size_mib)
+    logger.debug(
+        "Writing ndtbl group to %s: dimension=%d, points=%d, "
+        "fields=%d, dtype=%s, size=%d bytes",
+        path,
+        group.dimension,
+        group.point_count,
+        group.field_count,
+        group.dtype_name,
+        serialized_bytes,
     )
     with open_for_write(path) as stream:
         write_group_to_stream(stream, group)
+    logger.debug("Wrote ndtbl group to %s", path)
