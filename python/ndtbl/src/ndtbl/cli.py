@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import click
@@ -10,7 +11,13 @@ from .generate import (
     generate_group,
 )
 from .io import DEFAULT_MAX_SIZE_MIB, read_group, write_group
-from .model import ExplicitAxis, FieldGroup, GroupMetadata, UniformAxis
+from .model import (
+    ExplicitAxis,
+    FieldGroup,
+    GroupMetadata,
+    NdtblFormatError,
+    UniformAxis,
+)
 
 _INSPECT_BANNER = r"""
 |========================================|
@@ -24,6 +31,30 @@ _INSPECT_BANNER = r"""
 |                                        |
 |========================================|
 """
+
+
+def _configure_verbose_logging(ctx: click.Context) -> None:
+    """Enable temporary debug logging for the ndtbl CLI invocation."""
+    package_logger = logging.getLogger("ndtbl")
+    previous_level = package_logger.level
+    previous_propagate = package_logger.propagate
+
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(
+        logging.Formatter("%(levelname)s %(name)s: %(message)s")
+    )
+    package_logger.addHandler(handler)
+    package_logger.setLevel(logging.DEBUG)
+    package_logger.propagate = False
+
+    def restore_logging() -> None:
+        package_logger.removeHandler(handler)
+        handler.close()
+        package_logger.setLevel(previous_level)
+        package_logger.propagate = previous_propagate
+
+    ctx.call_on_close(restore_logging)
 
 
 class _HelpOnlyOption(click.Option):
@@ -278,8 +309,17 @@ def _enforce_generation_size_limit(
 
 
 @click.group()
-def main() -> None:
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    help="Show debug diagnostics on stderr.",
+)
+@click.pass_context
+def main(ctx: click.Context, verbose: bool) -> None:
     """Read, inspect, and generate .ndtbl files."""
+    if verbose:
+        _configure_verbose_logging(ctx)
 
 
 @main.command("inspect")
@@ -309,7 +349,7 @@ def inspect_command(file: Path, samples: int, banner: bool) -> None:
 
     try:
         group = read_group(file)
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, NdtblFormatError) as error:
         raise click.ClickException(str(error)) from error
     if banner:
         _echo_inspect_banner()
@@ -341,7 +381,7 @@ def query_command(
 
     try:
         group = read_group(file)
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, NdtblFormatError) as error:
         raise click.ClickException(str(error)) from error
 
     validated_indices = _validate_query_indices(indices, group)
