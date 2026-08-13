@@ -84,15 +84,15 @@ def test_verbose_logging_does_not_leak_into_later_invocations(
     assert "DEBUG ndtbl.io:" not in result.output
 
 
-def test_verbose_failure_is_not_also_logged_as_error(runner, tmp_path) -> None:
+def test_verbose_failure_reports_click_error_once(runner, tmp_path) -> None:
     path = tmp_path / "invalid-verbose.ndtbl"
     path.write_bytes(b"not an ndtbl file")
 
     result = runner.invoke(main, ["--verbose", "inspect", str(path)])
 
     assert result.exit_code != 0
-    assert str(result.exception) == "invalid ndtbl magic header"
     assert result.stderr.count("Reading ndtbl group from") == 1
+    assert result.stderr.count("Error: invalid ndtbl magic header") == 1
     assert "ERROR ndtbl.io:" not in result.stderr
 
 
@@ -122,6 +122,7 @@ def test_inspect_invalid_file_reports_error_without_banner(
 
     assert result.exit_code != 0
     assert _INSPECT_BANNER not in result.output
+    assert "Error: invalid ndtbl magic header" in result.stderr
 
 
 def test_query_prints_values_for_requested_point(
@@ -206,6 +207,16 @@ def test_query_rejects_out_of_range_indices(
 
     assert result.exit_code != 0
     assert "index for axis 0 out of range" in result.output
+
+
+def test_query_invalid_file_reports_click_error(runner, tmp_path) -> None:
+    path = tmp_path / "invalid-query.ndtbl"
+    path.write_bytes(b"not an ndtbl file")
+
+    result = runner.invoke(main, ["query", str(path), "0"])
+
+    assert result.exit_code != 0
+    assert "Error: invalid ndtbl magic header" in result.stderr
 
 
 def test_generate_writes_expected_file_with_long_options(

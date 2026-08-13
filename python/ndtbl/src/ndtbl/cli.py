@@ -11,7 +11,13 @@ from .generate import (
     generate_group,
 )
 from .io import DEFAULT_MAX_SIZE_MIB, read_group, write_group
-from .model import ExplicitAxis, FieldGroup, GroupMetadata, UniformAxis
+from .model import (
+    ExplicitAxis,
+    FieldGroup,
+    GroupMetadata,
+    NdtblFormatError,
+    UniformAxis,
+)
 
 _INSPECT_BANNER = r"""
 |========================================|
@@ -343,7 +349,7 @@ def inspect_command(file: Path, samples: int, banner: bool) -> None:
 
     try:
         group = read_group(file)
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, NdtblFormatError) as error:
         raise click.ClickException(str(error)) from error
     if banner:
         _echo_inspect_banner()
@@ -375,7 +381,7 @@ def query_command(
 
     try:
         group = read_group(file)
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, NdtblFormatError) as error:
         raise click.ClickException(str(error)) from error
 
     validated_indices = _validate_query_indices(indices, group)
