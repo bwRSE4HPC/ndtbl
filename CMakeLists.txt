@@ -4,6 +4,7 @@ cmake_minimum_required(VERSION 3.28)
 project(ndtbl
   VERSION 0.0.1
   DESCRIPTION "Multidimensional table lookup and interpolation"
+  HOMEPAGE_URL "https://github.com/thomasisensee/ndtbl"
   LANGUAGES CXX
 )
 
