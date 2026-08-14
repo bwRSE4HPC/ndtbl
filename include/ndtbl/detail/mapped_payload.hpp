@@ -10,6 +10,10 @@
 #define NDTBL_ENABLE_MMAP_POPULATE 0
 #endif
 
+#ifndef NDTBL_ENABLE_MMAP_LOCK
+#define NDTBL_ENABLE_MMAP_LOCK 0
+#endif
+
 #ifndef NDTBL_ENABLE_MMAP_DIAGNOSTICS
 #define NDTBL_ENABLE_MMAP_DIAGNOSTICS 0
 #endif
@@ -44,6 +48,12 @@
 #if NDTBL_ENABLE_MMAP_DIAGNOSTICS
 #if !NDTBL_ENABLE_MMAP
 #error "NDTBL_ENABLE_MMAP_DIAGNOSTICS requires NDTBL_ENABLE_MMAP"
+#endif
+#endif
+
+#if NDTBL_ENABLE_MMAP_LOCK
+#if !NDTBL_ENABLE_MMAP
+#error "NDTBL_ENABLE_MMAP_LOCK requires NDTBL_ENABLE_MMAP"
 #endif
 #endif
 
@@ -339,6 +349,15 @@ map_payload_bytes(const std::string& path,
     errno = saved_errno;
     throw IOError(system_error_message("failed to map ndtbl payload"));
   }
+
+#if NDTBL_ENABLE_MMAP_LOCK
+  if (mlock(mapping, mapping_length) != 0) {
+    const int saved_lock_errno = errno;
+    munmap(mapping, mapping_length);
+    errno = saved_lock_errno;
+    throw IOError(system_error_message("failed to lock ndtbl payload"));
+  }
+#endif
 
   const auto owner =
     std::make_shared<mapped_payload_owner>(mapping, mapping_length);

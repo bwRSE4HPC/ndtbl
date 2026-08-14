@@ -16,8 +16,7 @@ This repository currently contains two user-facing parts:
 - a separate [pure-Python package](https://pypi.org/project/ndtbl/) in `python/ndtbl/` for reading,
 writing, inspecting, querying, and generating `.ndtbl` files
 
-The C++ reader can also be built with optional POSIX `mmap` memory mapping support so payloads
-can stay file-backed instead of always being copied into heap memory entirely.
+The C++ reader can also be built with optional POSIX `mmap` memory mapping support so payloads can stay file-backed instead of always being copied into heap memory entirely.
 
 ## 🗂️ Layout
 
@@ -68,19 +67,22 @@ Relevant CMake options:
 - `ndtbl_ENABLE_MMAP`: enable POSIX-only `mmap`-backed payload reads, default `OFF`
 - `ndtbl_ENABLE_MMAP_POPULATE`: add Linux-only `MAP_POPULATE` to `mmap`-backed
   payload reads, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
+- `ndtbl_ENABLE_MMAP_LOCK`: lock `mmap`-backed payload pages in memory with
+  `mlock()`, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
 - `ndtbl_ENABLE_MMAP_DIAGNOSTICS`: enable mmap payload residency diagnostics
   through `mincore`, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
 
-When `ndtbl_ENABLE_MMAP=OFF` (the default), `read_field_group()` and
-`read_runtime_field_group()` read payload data into owned heap storage. When
-`ndtbl_ENABLE_MMAP=ON`, supported POSIX builds use read-only memory mapping
-instead, which can reduce heap usage for large tables and enables shared memory
-access in multi-process environments. On Linux, `ndtbl_ENABLE_MMAP_POPULATE=ON`
-adds `MAP_POPULATE` to the mapping flags so the kernel faults the mapped payload
-in during `mmap()` instead of on first access.
+When `ndtbl_ENABLE_MMAP=OFF` (the default), `read_field_group()` and `read_runtime_field_group()` read payload data into owned heap storage. When `ndtbl_ENABLE_MMAP=ON`, supported POSIX builds use read-only memory mapping instead, which can reduce heap usage for large tables and enables shared memory access in multi-process environments. On Linux, `ndtbl_ENABLE_MMAP_POPULATE=ON` adds `MAP_POPULATE` to the mapping flags so the kernel faults the mapped payload in during `mmap()` instead of on first access.
 
-When `ndtbl_ENABLE_MMAP_DIAGNOSTICS=ON`, mmap-loaded field groups can report OS
-page residency for their payload:
+When `ndtbl_ENABLE_MMAP_LOCK=ON`, each mapped payload is populated and locked in memory with `mlock()` for the lifetime of the mapping. Loading fails with an
+`ndtbl::IOError` if the mapping cannot be locked; there is no unlocked fallback. This option is independent of `ndtbl_ENABLE_MMAP_POPULATE`. Enabling both is
+allowed, but the explicit `mlock()` already faults in the complete mapping.
+
+Memory-lock limits apply per process. In an MPI run, every rank needs an `RLIMIT_MEMLOCK` allowance large enough for all mapped payloads and any memory
+already pinned by MPI or RDMA, even though file-backed physical pages can remain shared by ranks on the same node. Check the effective limit (for example with
+`ulimit -l`) before enabling locking.
+
+When `ndtbl_ENABLE_MMAP_DIAGNOSTICS=ON`, mmap-loaded field groups can report OS page residency for their payload:
 
 ```cpp
 const auto info = group.payload_residency();
@@ -89,8 +91,7 @@ if (info.available) {
 }
 ```
 
-The diagnostic is page-granular: it reports what `mincore` exposes for the
-mapped payload pages, not exact application RSS or exact bytes touched.
+The diagnostic is page-granular: it reports what `mincore` exposes for the mapped payload pages, not exact application RSS or exact bytes touched.
 
 If you want to install the C++ headers and CMake package metadata:
 
@@ -112,6 +113,13 @@ cmake -B build -Dndtbl_ENABLE_MMAP=ON -Dndtbl_ENABLE_MMAP_POPULATE=ON
 cmake --build build
 ```
 
+To populate and lock mmap-backed payload pages in memory:
+
+```bash
+cmake -B build -Dndtbl_ENABLE_MMAP=ON -Dndtbl_ENABLE_MMAP_LOCK=ON
+cmake --build build
+```
+
 To enable mmap payload residency diagnostics on Linux:
 
 ```bash
@@ -129,24 +137,14 @@ Inspect existing `.ndtbl` files:
 
 ## 📐 Interpolation
 
-The standard C++ lookup path uses multilinear interpolation through explicit
-`evaluate_all_linear()` and `Grid::prepare_linear()` calls. This path uses
-`2^Dim` table points per query and keeps the hot path allocation-free.
+The standard C++ lookup path uses multilinear interpolation through explicit `evaluate_all_linear()` and `Grid::prepare_linear()` calls. This path uses `2^Dim` table points per query and keeps the hot path allocation-free.
 
-The C++ API also exposes local tensor-product cubic interpolation through
-explicit `evaluate_all_cubic()` and `Grid::prepare_cubic()` calls. Cubic
-interpolation uses `4^Dim` table points, can be much more expensive in high
-dimensions, and may overshoot smooth-looking table data enough to produce
-unwanted values. Bounds handling is independent of interpolation order:
-queries outside the table domain can either clamp or throw according to the
+The C++ API also exposes local tensor-product cubic interpolation through explicit `evaluate_all_cubic()` and `Grid::prepare_cubic()` calls. Cubic interpolation uses `4^Dim` table points, can be much more expensive in high dimensions, and may overshoot smooth-looking table data enough to produce unwanted values. Bounds handling is independent of interpolation order: queries outside the table domain can either clamp or throw according to the
 selected `bounds_policy`.
 
 ## C++ Error Handling
 
-The C++ API distinguishes invalid table data, system I/O failures, and invalid
-object state through `ndtbl::FormatError`, `ndtbl::IOError`, and
-`ndtbl::StateError`. All three derive from `ndtbl::Error` and provide the
-standard `what()` message interface:
+The C++ API distinguishes invalid table data, system I/O failures, and invalid object state through `ndtbl::FormatError`, `ndtbl::IOError`, and `ndtbl::StateError`. All three derive from `ndtbl::Error` and provide the standard `what()` message interface:
 
 ```cpp
 try {
@@ -163,16 +161,13 @@ try {
 }
 ```
 
-Argument, bounds, and size failures continue to use the standard
-`std::invalid_argument`, `std::out_of_range`, and `std::overflow_error`
-categories.
+Argument, bounds, and size failures continue to use the standard `std::invalid_argument`, `std::out_of_range`, and `std::overflow_error` categories.
 
 ## 🐍 Python Package
 
 The repository also ships a separate Python package in [`python/ndtbl/`](https://github.com/thomasisensee/ndtbl/tree/main/python/ndtbl).
 
-That package installs a different CLI executable named `ndtbl`, with the
-subcommands:
+That package installs a different CLI executable named `ndtbl`, with the subcommands:
 
 - `inspect`
 - `query`
@@ -211,10 +206,7 @@ ctest --output-on-failure
 
 ## ⏱️ Benchmarks
 
-The lookup-time benchmarks use [Google Benchmark](https://github.com/google/benchmark) and measure
-query preparation, prepared evaluation, typed combined lookup, and
-runtime-erased combined lookup for representative 2D, 4D, and 6D tables. See
-[`benchmarks/README.md`](https://github.com/thomasisensee/ndtbl/tree/main/benchmarks) for the benchmark case definitions and interpretation.
+The lookup-time benchmarks use [Google Benchmark](https://github.com/google/benchmark) and measure query preparation, prepared evaluation, typed combined lookup, and runtime-erased combined lookup for representative 2D, 4D, and 6D tables. See [`benchmarks/README.md`](https://github.com/thomasisensee/ndtbl/tree/main/benchmarks) for the benchmark case definitions and interpretation.
 
 Build the benchmark target:
 
@@ -234,8 +226,7 @@ Run a benchmark:
 Online documentation is available at
 [ndtbl.readthedocs.io](https://ndtbl.readthedocs.io/).
 
-To build the docs locally, first install the documentation requirements from
-the top-level `ndtbl/` directory:
+To build the docs locally, first install the documentation requirements from the top-level `ndtbl/` directory:
 
 ```bash
 python -m pip install -r doc/requirements.txt

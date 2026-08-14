@@ -17,6 +17,12 @@
 #include <type_traits>
 #include <vector>
 
+#if NDTBL_ENABLE_MMAP_LOCK && defined(__linux__)
+#include <sys/resource.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
+
 static_assert(std::is_base_of<std::runtime_error, ndtbl::Error>::value,
               "ndtbl errors must expose the standard runtime-error API");
 static_assert(std::is_base_of<ndtbl::Error, ndtbl::FormatError>::value,
@@ -25,6 +31,39 @@ static_assert(std::is_base_of<ndtbl::Error, ndtbl::IOError>::value,
               "I/O errors must derive from the ndtbl error base");
 static_assert(std::is_base_of<ndtbl::Error, ndtbl::StateError>::value,
               "state errors must derive from the ndtbl error base");
+
+#if NDTBL_ENABLE_MMAP_LOCK && defined(__linux__)
+
+namespace {
+
+std::size_t
+locked_memory_kib()
+{
+  std::ifstream status("/proc/self/status");
+  if (!status.is_open()) {
+    throw std::runtime_error("failed to open /proc/self/status");
+  }
+
+  std::string line;
+  while (std::getline(status, line)) {
+    if (line.compare(0, 6, "VmLck:") != 0) {
+      continue;
+    }
+
+    std::istringstream value_stream(line.substr(6));
+    std::size_t value_kib = 0;
+    if (!(value_stream >> value_kib)) {
+      throw std::runtime_error("failed to parse VmLck");
+    }
+    return value_kib;
+  }
+
+  throw std::runtime_error("VmLck is missing from /proc/self/status");
+}
+
+} // namespace
+
+#endif
 
 TEST_CASE("ndtbl exceptions preserve messages and support base catches",
           "[exceptions]")
@@ -196,6 +235,82 @@ TEST_CASE("payload residency reports availability for supported storage",
 
   std::remove(path.c_str());
 }
+
+#if NDTBL_ENABLE_MMAP_LOCK && defined(__linux__)
+
+TEST_CASE("mmap locking holds payload pages for the loaded group lifetime",
+          "[io][mmap][lock]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 2.0, 4.0 });
+
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, group);
+
+  const std::size_t locked_before_kib = locked_memory_kib();
+  {
+    const ndtbl::FieldGroup<1, double> loaded =
+      ndtbl::read_field_group<1, double>(path);
+    std::array<double, 1> values = { 0.0 };
+    loaded.evaluate_all_linear_into({ 0.5 }, values.data());
+
+    REQUIRE(values[0] == Catch::Approx(3.0));
+    REQUIRE(locked_memory_kib() > locked_before_kib);
+  }
+  REQUIRE(locked_memory_kib() == locked_before_kib);
+
+  std::remove(path.c_str());
+}
+
+TEST_CASE("mmap locking reports memlock limit failures as I/O errors",
+          "[io][mmap][lock]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 2.0, 4.0 });
+
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, group);
+
+  const pid_t child = fork();
+  REQUIRE(child >= 0);
+  if (child == 0) {
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_MEMLOCK, &limit) != 0) {
+      _exit(2);
+    }
+    limit.rlim_cur = 0;
+    if (setrlimit(RLIMIT_MEMLOCK, &limit) != 0) {
+      _exit(3);
+    }
+
+    try {
+      const ndtbl::FieldGroup<1, double> loaded =
+        ndtbl::read_field_group<1, double>(path);
+      static_cast<void>(loaded);
+    } catch (const ndtbl::IOError&) {
+      _exit(0);
+    } catch (...) {
+      _exit(4);
+    }
+    _exit(5);
+  }
+
+  int child_status = 0;
+  const pid_t waited_child = waitpid(child, &child_status, 0);
+  std::remove(path.c_str());
+
+  REQUIRE(waited_child == child);
+  REQUIRE(WIFEXITED(child_status));
+  REQUIRE(WEXITSTATUS(child_status) == 0);
+}
+
+#endif
 
 TEST_CASE("typed field group loader rejects wrong scalar type", "[io]")
 {

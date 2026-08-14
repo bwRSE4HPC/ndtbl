@@ -12,14 +12,30 @@ project(ndtbl
 include(GNUInstallDirs)
 
 # Define build options
-option(ndtbl_BUILD_BENCHMARKS "Enable building of benchmarks" OFF)
-option(ndtbl_BUILD_DOCS "Enable building of documentation" OFF)
-option(ndtbl_BUILD_TESTING "Enable building of tests" OFF)
+option(ndtbl_BUILD_BENCHMARKS
+  "Enable building of benchmarks"
+  OFF
+)
+option(ndtbl_BUILD_DOCS
+  "Enable building of documentation"
+  OFF
+)
+option(ndtbl_BUILD_TESTING
+  "Enable building of tests"
+  OFF
+)
 
 # Option for enabling POSIX mmap support for payload reads
-option(ndtbl_ENABLE_MMAP "Enable POSIX mmap-backed ndtbl payload reads" OFF)
+option(ndtbl_ENABLE_MMAP
+  "Enable POSIX mmap-backed ndtbl payload reads"
+  OFF
+)
 option(ndtbl_ENABLE_MMAP_POPULATE
   "Enable Linux MAP_POPULATE for mmap-backed ndtbl payload reads"
+  OFF
+)
+option(ndtbl_ENABLE_MMAP_LOCK
+  "Lock mmap-backed ndtbl payload pages in memory"
   OFF
 )
 option(ndtbl_ENABLE_MMAP_DIAGNOSTICS
@@ -37,6 +53,10 @@ endif()
 
 if(ndtbl_ENABLE_MMAP_POPULATE AND NOT LINUX)
   message(FATAL_ERROR "ndtbl_ENABLE_MMAP_POPULATE requires Linux")
+endif()
+
+if(ndtbl_ENABLE_MMAP_LOCK AND NOT ndtbl_ENABLE_MMAP)
+  message(FATAL_ERROR "ndtbl_ENABLE_MMAP_LOCK requires ndtbl_ENABLE_MMAP")
 endif()
 
 if(ndtbl_ENABLE_MMAP_DIAGNOSTICS AND NOT ndtbl_ENABLE_MMAP)
@@ -77,6 +97,7 @@ target_compile_definitions(ndtbl
   INTERFACE
     NDTBL_ENABLE_MMAP=$<BOOL:${ndtbl_ENABLE_MMAP}>
     NDTBL_ENABLE_MMAP_POPULATE=$<BOOL:${ndtbl_ENABLE_MMAP_POPULATE}>
+    NDTBL_ENABLE_MMAP_LOCK=$<BOOL:${ndtbl_ENABLE_MMAP_LOCK}>
     NDTBL_ENABLE_MMAP_DIAGNOSTICS=$<BOOL:${ndtbl_ENABLE_MMAP_DIAGNOSTICS}>
 )
 
