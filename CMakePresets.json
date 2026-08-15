@@ -36,21 +36,30 @@
       }
     },
     {
-      "name": "test",
-      "displayName": "Debug with tests",
-      "description": "Debug build with the C++ test suite enabled",
-      "inherits": "debug",
-      "cacheVariables": {
-        "ndtbl_BUILD_TESTING": true
-      }
-    },
-    {
       "name": "benchmark",
       "displayName": "Release with benchmarks",
       "description": "Release build with Google Benchmark enabled",
       "inherits": "release",
       "cacheVariables": {
         "ndtbl_BUILD_BENCHMARKS": true
+      }
+    },
+    {
+      "name": "documentation",
+      "displayName": "Release build with documentation",
+      "description": "Release build with Doxygen and Sphinx enabled",
+      "inherits": "release",
+      "cacheVariables": {
+        "ndtbl_BUILD_DOCS": true
+      }
+    },
+    {
+      "name": "test",
+      "displayName": "Debug with tests",
+      "description": "Debug build with the C++ test suite enabled",
+      "inherits": "debug",
+      "cacheVariables": {
+        "ndtbl_BUILD_TESTING": true
       }
     }
   ],
@@ -64,15 +73,22 @@
       "configurePreset": "release"
     },
     {
-      "name": "test",
-      "configurePreset": "test"
-    },
-    {
       "name": "benchmark",
       "configurePreset": "benchmark",
       "targets": [
         "ndtbl_lookup_benchmarks"
       ]
+    },
+    {
+      "name": "documentation",
+      "configurePreset": "documentation",
+      "targets": [
+        "ndtbl-sphinx-doc"
+      ]
+    },
+    {
+      "name": "test",
+      "configurePreset": "test"
     }
   ],
   "testPresets": [
