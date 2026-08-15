@@ -9,8 +9,8 @@ build:
     - doxygen
   jobs:
     pre_build:
-      - cmake -B build -Dndtbl_BUILD_DOCS=ON -Dndtbl_BUILD_TESTING=OFF -Dndtbl_BUILD_BENCHMARKS=OFF
-      - cmake --build build --target ndtbl-doxygen
+      - cmake --preset documentation
+      - cmake --build --preset documentation
     build:
       html:
         - uv run --project python/ndtbl sphinx-build -T -j auto -b html -d doc/_build/doctrees -D language=en doc $READTHEDOCS_OUTPUT/html
