@@ -1,10 +1,10 @@
 # ndtbl
 
 [![License](https://img.shields.io/pypi/l/ndtbl?label=License)](https://opensource.org/licenses/MIT)
-[![Build](https://github.com/thomasisensee/ndtbl/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasisensee/ndtbl/actions)
+[![Build](https://github.com/bwrse4hpc/ndtbl/actions/workflows/ci.yml/badge.svg)](https://github.com/bwrse4hpc/ndtbl/actions)
 [![Documentation](https://readthedocs.org/projects/ndtbl/badge/)](https://ndtbl.readthedocs.io/)
 [![codecov](https://codecov.io/gh/thomasisensee/ndtbl/graph/badge.svg?flag=cpp&token=5N4GQ0YP7I)](https://codecov.io/gh/thomasisensee/ndtbl)
-[![pre-commit.ci](https://results.pre-commit.ci/badge/github/thomasisensee/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/thomasisensee/ndtbl/main)
+[![pre-commit.ci](https://results.pre-commit.ci/badge/github/bwrse4hpc/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/bwrse4hpc/ndtbl/main)
 [![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=bwrse4hpc_ndtbl&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bwrse4hpc_ndtbl)
 [![C++](https://img.shields.io/badge/C%2B%2B-14-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B#Standardization)
 
@@ -32,7 +32,7 @@ The C++ reader can also be built with optional POSIX `mmap` memory mapping suppo
 
 Use the C++ library when you want to integrate `ndtbl`'s lookup logic directly into a C++ application.
 
-Use the Python package when you want a pip-installable Python interface for creating `.ndtbl` files from NumPy arrays, inspecting existing `.ndtbl` files, or running queries against them. The Python package also provides a convenient CLI for inspecting, querying, and generating `.ndtbl` files. See [`python/ndtbl/README.md`](https://github.com/thomasisensee/ndtbl/tree/main/python/ndtbl) for Python package details.
+Use the Python package when you want a pip-installable Python interface for creating `.ndtbl` files from NumPy arrays, inspecting existing `.ndtbl` files, or running queries against them. The Python package also provides a convenient CLI for inspecting, querying, and generating `.ndtbl` files. See [`python/ndtbl/README.md`](https://github.com/bwrse4hpc/ndtbl/tree/main/python/ndtbl) for Python package details.
 
 If you want to inspect `.ndtbl`files with a C++ command-line tool, use the C++ `ndtbl-inspect` executable built from `app/`. It is not prebuilt; it becomes available only after running the local CMake build.
 
@@ -163,7 +163,7 @@ Argument, bounds, and size failures continue to use the standard `std::invalid_a
 
 ## 🐍 Python Package
 
-The repository also ships a separate Python package in [`python/ndtbl/`](https://github.com/thomasisensee/ndtbl/tree/main/python/ndtbl).
+The repository also ships a separate Python package in [`python/ndtbl/`](https://github.com/bwrse4hpc/ndtbl/tree/main/python/ndtbl).
 
 That package installs a different CLI executable named `ndtbl`, with the subcommands:
 
@@ -184,7 +184,7 @@ After that, the Python CLI is available:
 ndtbl --help
 ```
 
-See [`python/ndtbl/README.md`](https://github.com/thomasisensee/ndtbl/tree/main/python/ndtbl) for usage examples and Python API details.
+See [`python/ndtbl/README.md`](https://github.com/bwrse4hpc/ndtbl/tree/main/python/ndtbl) for usage examples and Python API details.
 
 ## 🧪 Testing
 
@@ -204,7 +204,7 @@ ctest --output-on-failure
 
 ## ⏱️ Benchmarks
 
-The lookup-time benchmarks use [Google Benchmark](https://github.com/google/benchmark) and measure query preparation, prepared evaluation, typed combined lookup, and runtime-erased combined lookup for representative 2D, 4D, and 6D tables. See [`benchmarks/README.md`](https://github.com/thomasisensee/ndtbl/tree/main/benchmarks) for the benchmark case definitions and interpretation.
+The lookup-time benchmarks use [Google Benchmark](https://github.com/google/benchmark) and measure query preparation, prepared evaluation, typed combined lookup, and runtime-erased combined lookup for representative 2D, 4D, and 6D tables. See [`benchmarks/README.md`](https://github.com/bwrse4hpc/ndtbl/tree/main/benchmarks) for the benchmark case definitions and interpretation.
 
 Build the benchmark target:
 

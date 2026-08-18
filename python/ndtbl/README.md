@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/pypi/l/ndtbl?label=License)](https://opensource.org/licenses/MIT)
 [![codecov](https://codecov.io/gh/thomasisensee/ndtbl/graph/badge.svg?flag=python&token=5N4GQ0YP7I)](https://codecov.io/gh/thomasisensee/ndtbl)
-[![pre-commit.ci](https://results.pre-commit.ci/badge/github/thomasisensee/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/thomasisensee/ndtbl/main)
+[![pre-commit.ci](https://results.pre-commit.ci/badge/github/bwrse4hpc/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/bwrse4hpc/ndtbl/main)
 [![PyPI](https://img.shields.io/pypi/v/ndtbl?logo=pypi&logoColor=gold&label=PyPI)](https://pypi.org/project/ndtbl)
 [![Python](https://img.shields.io/pypi/pyversions/ndtbl?logo=python&logoColor=gold&label=Python)](https://pypi.org/project/ndtbl)
 
@@ -89,7 +89,7 @@ Diagnostics use the `ndtbl` logger hierarchy and never include payload values.
 The `values` array shape is `axis_0 x axis_1 x ... x field`.
 
 ### Demo notebook
-Use the [demo notebook](https://github.com/thomasisensee/ndtbl/blob/main/python/ndtbl/notebooks/demo.ipynb) to test the Python functionality of `ndtbl` and see how it can be used to read and write binary `.ndtbl` files.
+Use the [demo notebook](https://github.com/bwrse4hpc/ndtbl/blob/main/python/ndtbl/notebooks/demo.ipynb) to test the Python functionality of `ndtbl` and see how it can be used to read and write binary `.ndtbl` files.
 
 
 ## 💻 CLI
