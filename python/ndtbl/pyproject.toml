@@ -39,7 +39,7 @@ dependencies = [
 ]
 
 [project.urls]
-repository = "https://github.com/thomasisensee/ndtbl"
+repository = "https://github.com/bwrse4hpc/ndtbl"
 documentation = "https://ndtbl.readthedocs.io/"
 
 [project.optional-dependencies]
