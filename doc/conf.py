@@ -4,19 +4,17 @@
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-import os
 import sys
+from pathlib import Path
 
 # -- Path setup --------------------------------------------------------------
 
 # If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-#
-doc_dir = os.path.abspath(os.path.dirname(__file__))
-repo_root = os.path.abspath(os.path.join(doc_dir, ".."))
-python_package_src = os.path.join(repo_root, "python", "ndtbl", "src")
-sys.path.insert(0, python_package_src)
+# add these directories to sys.path here.
+repo_root = Path(__file__).resolve().parent.parent
+python_package_src = repo_root / "python" / "ndtbl" / "src"
+
+sys.path.insert(0, str(python_package_src))
 
 
 # -- Project information -----------------------------------------------------
@@ -45,6 +43,6 @@ html_theme = "sphinx_rtd_theme"
 # Breathe Configuration: Breathe is the bridge between the information extracted
 # from the C++ sources by Doxygen and Sphinx.
 breathe_projects = {
-    "ndtbl": os.path.join(repo_root, "build", "doc", "xml"),
+    "ndtbl": str(repo_root / "build" / "documentation" / "doc" / "xml"),
 }
 breathe_default_project = "ndtbl"
