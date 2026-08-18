@@ -67,20 +67,16 @@ Relevant CMake options:
 - `ndtbl_ENABLE_MMAP`: enable POSIX-only `mmap`-backed payload reads, default `OFF`
 - `ndtbl_ENABLE_MMAP_POPULATE`: add Linux-only `MAP_POPULATE` to `mmap`-backed
   payload reads, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
-- `ndtbl_ENABLE_MMAP_LOCK`: lock `mmap`-backed payload pages in memory with
-  `mlock()`, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
+- `ndtbl_ENABLE_MMAP_LOCK`: lock `mmap`-backed payload pages in memory, default
+  `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
 - `ndtbl_ENABLE_MMAP_DIAGNOSTICS`: enable mmap payload residency diagnostics
   through `mincore`, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
 
 When `ndtbl_ENABLE_MMAP=OFF` (the default), `read_field_group()` and `read_runtime_field_group()` read payload data into owned heap storage. When `ndtbl_ENABLE_MMAP=ON`, supported POSIX builds use read-only memory mapping instead, which can reduce heap usage for large tables and enables shared memory access in multi-process environments. On Linux, `ndtbl_ENABLE_MMAP_POPULATE=ON` adds `MAP_POPULATE` to the mapping flags so the kernel faults the mapped payload in during `mmap()` instead of on first access.
 
-When `ndtbl_ENABLE_MMAP_LOCK=ON`, each mapped payload is populated and locked in memory with `mlock()` for the lifetime of the mapping. Loading fails with an
-`ndtbl::IOError` if the mapping cannot be locked; there is no unlocked fallback. This option is independent of `ndtbl_ENABLE_MMAP_POPULATE`. Enabling both is
-allowed, but the explicit `mlock()` already faults in the complete mapping.
+When `ndtbl_ENABLE_MMAP_LOCK=ON`, each mapped payload is locked for the lifetime of the mapping. On Linux, locking without `ndtbl_ENABLE_MMAP_POPULATE` uses `mlock2(..., MLOCK_ONFAULT)`: pages remain nonresident until first access and stay locked afterward. This lazy locking mode requires Linux 4.4 or newer and system headers and a C library that expose `mlock2()` and `MLOCK_ONFAULT`. Enabling both locking and population uses `mlock()` after `MAP_POPULATE`, so the complete mapping is resident when loading returns. Other POSIX platforms always use `mlock()`. Loading fails with an `ndtbl::IOError` if the selected locking operation fails; there is no eager or unlocked fallback.
 
-Memory-lock limits apply per process. In an MPI run, every rank needs an `RLIMIT_MEMLOCK` allowance large enough for all mapped payloads and any memory
-already pinned by MPI or RDMA, even though file-backed physical pages can remain shared by ranks on the same node. Check the effective limit (for example with
-`ulimit -l`) before enabling locking.
+Memory-lock limits apply per process. In an MPI run, every rank needs an `RLIMIT_MEMLOCK` allowance large enough for all mapped payloads and any memory already pinned by MPI or RDMA, even when Linux pages are locked only upon fault and even though file-backed physical pages can remain shared by ranks on the same node. Check the effective limit (for example with `ulimit -l`) before enabling locking.
 
 When `ndtbl_ENABLE_MMAP_DIAGNOSTICS=ON`, mmap-loaded field groups can report OS page residency for their payload:
 
@@ -113,12 +109,14 @@ cmake -B build -Dndtbl_ENABLE_MMAP=ON -Dndtbl_ENABLE_MMAP_POPULATE=ON
 cmake --build build
 ```
 
-To populate and lock mmap-backed payload pages in memory:
+To lock mmap-backed payload pages on first access on Linux:
 
 ```bash
 cmake -B build -Dndtbl_ENABLE_MMAP=ON -Dndtbl_ENABLE_MMAP_LOCK=ON
 cmake --build build
 ```
+
+Add `-Dndtbl_ENABLE_MMAP_POPULATE=ON` to populate and lock the complete payload while loading.
 
 To enable mmap payload residency diagnostics on Linux:
 

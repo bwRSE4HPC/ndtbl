@@ -238,6 +238,43 @@ TEST_CASE("payload residency reports availability for supported storage",
 
 #if NDTBL_ENABLE_MMAP_LOCK && defined(__linux__)
 
+TEST_CASE("mmap locking follows the configured population policy",
+          "[io][mmap][lock]")
+{
+  const long page_size = sysconf(_SC_PAGESIZE);
+  REQUIRE(page_size > 0);
+  const auto mapping_length = static_cast<std::size_t>(page_size) * 2;
+  void* const mapping = mmap(nullptr,
+                             mapping_length,
+                             PROT_READ | PROT_WRITE,
+                             MAP_PRIVATE | MAP_ANONYMOUS,
+                             -1,
+                             0);
+  REQUIRE(mapping != MAP_FAILED);
+
+  std::array<unsigned char, 2> resident = { 0, 0 };
+  REQUIRE(mincore(mapping, mapping_length, resident.data()) == 0);
+  REQUIRE((resident[0] & 1U) == 0U);
+  REQUIRE((resident[1] & 1U) == 0U);
+
+  REQUIRE(ndtbl::detail::lock_mapping_pages(mapping, mapping_length) == 0);
+  REQUIRE(mincore(mapping, mapping_length, resident.data()) == 0);
+#if NDTBL_ENABLE_MMAP_POPULATE
+  REQUIRE((resident[0] & 1U) != 0U);
+  REQUIRE((resident[1] & 1U) != 0U);
+#else
+  REQUIRE((resident[0] & 1U) == 0U);
+  REQUIRE((resident[1] & 1U) == 0U);
+
+  static_cast<volatile unsigned char*>(mapping)[0] = 1;
+  REQUIRE(mincore(mapping, mapping_length, resident.data()) == 0);
+  REQUIRE((resident[0] & 1U) != 0U);
+  REQUIRE((resident[1] & 1U) == 0U);
+#endif
+
+  REQUIRE(munmap(mapping, mapping_length) == 0);
+}
+
 TEST_CASE("mmap locking holds payload pages for the loaded group lifetime",
           "[io][mmap][lock]")
 {

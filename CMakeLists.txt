@@ -101,6 +101,10 @@ target_compile_definitions(ndtbl
     NDTBL_ENABLE_MMAP_DIAGNOSTICS=$<BOOL:${ndtbl_ENABLE_MMAP_DIAGNOSTICS}>
 )
 
+if(LINUX AND ndtbl_ENABLE_MMAP_LOCK AND NOT ndtbl_ENABLE_MMAP_POPULATE)
+  target_compile_definitions(ndtbl INTERFACE _GNU_SOURCE)
+endif()
+
 # Request a minimum C++ standard for this target
 target_compile_features(ndtbl
   INTERFACE

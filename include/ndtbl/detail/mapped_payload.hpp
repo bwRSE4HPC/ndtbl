@@ -292,6 +292,20 @@ private:
   std::size_t mapping_length_;
 };
 
+#if NDTBL_ENABLE_MMAP_LOCK
+
+inline int
+lock_mapping_pages(const void* mapping, std::size_t mapping_length)
+{
+#if defined(__linux__) && !NDTBL_ENABLE_MMAP_POPULATE
+  return mlock2(mapping, mapping_length, MLOCK_ONFAULT);
+#else
+  return mlock(mapping, mapping_length);
+#endif
+}
+
+#endif
+
 inline std::shared_ptr<const std::uint8_t>
 map_payload_bytes(const std::string& path,
                   std::size_t payload_offset,
@@ -351,7 +365,7 @@ map_payload_bytes(const std::string& path,
   }
 
 #if NDTBL_ENABLE_MMAP_LOCK
-  if (mlock(mapping, mapping_length) != 0) {
+  if (lock_mapping_pages(mapping, mapping_length) != 0) {
     const int saved_lock_errno = errno;
     munmap(mapping, mapping_length);
     errno = saved_lock_errno;
