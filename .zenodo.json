@@ -1,0 +1,24 @@
+{
+  "creators": [
+    {
+      "name": "Isensee, Thomas",
+      "orcid": "0000-0002-7242-4529",
+      "affiliation":
+        "Scientific Software Center (SSC), Interdisciplinary Center for Scientific Computing (IWR), Heidelberg University, Germany",
+      "type": "ProjectMember"
+    }
+  ],
+  "title": "ndtbl",
+  "access_right": "open",
+  "keywords": [
+    "scientific software"
+  ],
+  "license": "mit",
+  "upload_type": "software",
+  "language": "eng",
+  "communities": [
+    {
+      "identifier": "bwrse4hpc"
+    }
+  ]
+}
