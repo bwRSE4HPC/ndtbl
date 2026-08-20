@@ -1,3 +1,5 @@
+"""Read and write ndtbl files."""
+
 import logging
 from pathlib import Path
 
@@ -62,8 +64,8 @@ def read_metadata(path: str | Path) -> GroupMetadata:
 
     Returns:
         The parsed group metadata.
-    """
 
+    """
     path = Path(path)
     logger.debug("Reading ndtbl metadata from %s", path)
     with open_for_read(path) as stream:
@@ -89,8 +91,8 @@ def read_group(path: str | Path) -> FieldGroup:
 
     Returns:
         The parsed field group including payload values.
-    """
 
+    """
     path = Path(path)
     logger.debug("Reading ndtbl group from %s", path)
     with open_for_read(path) as stream:
@@ -120,8 +122,8 @@ def write_group(
         path: Destination path for the output ``.ndtbl`` file.
         group: In-memory field group to serialize.
         max_size_mib: Maximum serialized file size allowed before writing.
-    """
 
+    """
     path = Path(path)
     serialized_bytes = serialized_group_size(group)
     _enforce_file_size_limit(serialized_bytes, group, max_size_mib)

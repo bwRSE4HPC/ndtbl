@@ -1,3 +1,5 @@
+"""Define the public data model for ndtbl files."""
+
 from dataclasses import dataclass
 from typing import TypeAlias
 
@@ -23,6 +25,7 @@ class UniformAxis:
         min: Coordinate value at the first point.
         max: Coordinate value at the last point.
         size: Number of points along the axis.
+
     """
 
     min: float
@@ -64,6 +67,7 @@ class ExplicitAxis:
 
     Args:
         coordinates: One-dimensional, strictly increasing coordinates.
+
     """
 
     coordinates_values: tuple[float, ...]
@@ -126,8 +130,8 @@ def normalize_dtype(
 
     Raises:
         ValueError: If the dtype is not supported by the ndtbl format.
-    """
 
+    """
     normalized = np.dtype(dtype)
     if normalized == np.dtype(np.float32):
         return np.dtype(np.float32)
@@ -144,8 +148,8 @@ def _normalize_axes(axes: tuple[Axis, ...] | list[Axis]) -> tuple[Axis, ...]:
 
     Returns:
         The validated axes as a tuple.
-    """
 
+    """
     normalized = tuple(axes)
     if not normalized:
         raise ValueError("field groups must contain at least one axis")
@@ -167,8 +171,8 @@ def _normalize_field_names(
 
     Returns:
         The validated field names as a tuple of strings.
-    """
 
+    """
     normalized = tuple(str(name) for name in field_names)
     if not normalized:
         raise ValueError("field groups must contain at least one field")
@@ -185,8 +189,8 @@ def _normalize_values(values: ArrayLike) -> FloatArray:
 
     Returns:
         A contiguous float32 or float64 NumPy array.
-    """
 
+    """
     array = np.asarray(values)
     if not np.issubdtype(array.dtype, np.number):
         raise TypeError("field values must be numeric")
@@ -204,6 +208,7 @@ class GroupMetadata:
         field_names: Names of the stored fields.
         dtype: Payload scalar dtype, limited to float32 or float64.
         format_version: ndtbl binary file format version.
+
     """
 
     axes: tuple[Axis, ...]
@@ -263,6 +268,7 @@ class FieldGroup:
         axes: Axes that define the table dimensions.
         field_names: Names of the stored fields.
         values: Array shaped as ``(*axis_sizes, field_count)``.
+
     """
 
     axes: tuple[Axis, ...]
