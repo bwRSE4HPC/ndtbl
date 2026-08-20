@@ -1,3 +1,5 @@
+"""Create, inspect, and validate multidimensional ndtbl files."""
+
 from importlib import metadata
 
 from .io import read_group, read_metadata, write_group

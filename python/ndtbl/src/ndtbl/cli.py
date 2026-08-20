@@ -1,3 +1,5 @@
+"""Provide the ndtbl command-line interface."""
+
 import logging
 from pathlib import Path
 
@@ -74,8 +76,8 @@ def _format_axis(axis: UniformAxis | ExplicitAxis, axis_index: int) -> str:
 
     Returns:
         Human-readable axis summary line.
-    """
 
+    """
     if isinstance(axis, UniformAxis):
         return (
             f"axis[{axis_index}]: uniform "
@@ -95,8 +97,8 @@ def _echo_metadata(path: Path, metadata: GroupMetadata) -> None:
     Args:
         path: Source file path shown in the output.
         metadata: Metadata object to print.
-    """
 
+    """
     click.echo(f"file: {path}")
     click.echo(f"format_version: {metadata.format_version}")
     click.echo(f"dimension: {metadata.dimension}")
@@ -113,7 +115,6 @@ def _echo_metadata(path: Path, metadata: GroupMetadata) -> None:
 
 def _echo_inspect_banner() -> None:
     """Print the inspect command ASCII art header."""
-
     click.echo(_INSPECT_BANNER)
     click.echo()
 
@@ -124,8 +125,8 @@ def _echo_samples(group: FieldGroup, samples: int) -> None:
     Args:
         group: Field group whose values should be sampled.
         samples: Maximum number of flattened points to print.
-    """
 
+    """
     flat_values = group.values.reshape(
         group.point_count, group.field_count, order="C"
     )
@@ -147,8 +148,8 @@ def _validate_query_indices(
 
     Returns:
         The validated indices tuple.
-    """
 
+    """
     if len(indices) != group.dimension:
         raise click.UsageError(
             "query index count must match the table dimension: "
@@ -173,8 +174,8 @@ def _echo_query_values(group: FieldGroup, indices: tuple[int, ...]) -> None:
     Args:
         group: Field group being queried.
         indices: Zero-based point indices in axis order.
-    """
 
+    """
     values = group.values[indices]
     for field_name, value in zip(group.field_names, values, strict=True):
         click.echo(f"{field_name}: {value:g}")
@@ -190,8 +191,8 @@ def _parse_axes(
 
     Returns:
         Parsed axes in storage order.
-    """
 
+    """
     if not axis_specs:
         raise click.UsageError(
             "at least one --axis MIN MAX SIZE option is required"
@@ -218,8 +219,8 @@ def _parse_linear_fields(
 
     Returns:
         Tuple of output path and parsed field specifications.
-    """
 
+    """
     parsed_specs: list[LinearFieldSpec] = []
     output: Path | None = None
     index = 0
@@ -292,8 +293,8 @@ def _enforce_generation_size_limit(
         estimate: Estimated size information for the requested output.
         dtype_name: Human-readable payload dtype name.
         max_size_mib: User-configured maximum allowed output size.
-    """
 
+    """
     if estimate.estimated_file_mib <= max_size_mib:
         return
 
@@ -346,7 +347,6 @@ def inspect_command(file: Path, samples: int, banner: bool) -> None:
 
     Use ``--samples`` to limit how many flattened sample points are shown.
     """
-
     try:
         group = read_group(file)
     except (OSError, ValueError, NdtblFormatError) as error:
@@ -378,7 +378,6 @@ def query_command(
     INDICES are zero-based point indices in axis order. Use ``--metadata`` to
     print the table summary before the queried values.
     """
-
     try:
         group = read_group(file)
     except (OSError, ValueError, NdtblFormatError) as error:
@@ -452,7 +451,6 @@ def generate_command(
     Repeat ``--axis MIN MAX SIZE`` for each axis and ``--field-linear NAME
     OFFSET C0 [C1 ...]`` for each generated field.
     """
-
     axes = _parse_axes(axis_specs)
     extra_tokens = tuple(ctx.args)
     if output is not None:

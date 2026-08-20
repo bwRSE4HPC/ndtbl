@@ -1,3 +1,5 @@
+"""Generate ndtbl field groups from compact grid specifications."""
+
 from dataclasses import dataclass
 from typing import cast
 
@@ -30,6 +32,7 @@ class GenerationSizeEstimate:
         field_count: Number of generated fields.
         payload_bytes: Size of the numeric payload in bytes.
         estimated_file_bytes: Approximate full file size in bytes.
+
     """
 
     point_count: int
@@ -51,6 +54,7 @@ class LinearFieldSpec:
         name: Field name written into the output table.
         offset: Constant term added to every point.
         coefficients: One coefficient per axis, in axis order.
+
     """
 
     name: str
@@ -81,8 +85,8 @@ def _linear_field(
 
     Returns:
         Array of field values shaped like the grid.
-    """
 
+    """
     if len(spec.coefficients) != len(axes):
         raise ValueError(
             "linear field coefficient count does not match axis count"
@@ -122,8 +126,8 @@ def generate_group(
 
     Returns:
         A populated field group containing the generated values.
-    """
 
+    """
     if not axes:
         raise ValueError("at least one axis is required for generation")
     if not field_specs:
@@ -155,8 +159,8 @@ def estimate_generated_group_size(
 
     Returns:
         Summary including point count, payload size, and file size estimate.
-    """
 
+    """
     if not axes:
         raise ValueError("at least one axis is required for generation")
     if not field_specs:
