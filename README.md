@@ -65,12 +65,9 @@ Relevant CMake options:
 - `ndtbl_BUILD_BENCHMARKS`: build developer lookup benchmarks, default `OFF`
 - `ndtbl_BUILD_DOCS`: build the documentation, default `ON` for top-level builds
 - `ndtbl_ENABLE_MMAP`: enable POSIX-only `mmap`-backed payload reads, default `OFF`
-- `ndtbl_ENABLE_MMAP_POPULATE`: add Linux-only `MAP_POPULATE` to `mmap`-backed
-  payload reads, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
-- `ndtbl_ENABLE_MMAP_LOCK`: lock `mmap`-backed payload pages in memory, default
-  `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
-- `ndtbl_ENABLE_MMAP_DIAGNOSTICS`: enable mmap payload residency diagnostics
-  through `mincore`, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
+- `ndtbl_ENABLE_MMAP_POPULATE`: add Linux-only `MAP_POPULATE` to `mmap`-backed payload reads, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
+- `ndtbl_ENABLE_MMAP_LOCK`: lock `mmap`-backed payload pages in memory, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
+- `ndtbl_ENABLE_MMAP_DIAGNOSTICS`: enable mmap payload residency diagnostics through `mincore` and Linux `/proc`, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
 
 When `ndtbl_ENABLE_MMAP=OFF` (the default), `read_field_group()` and `read_runtime_field_group()` read payload data into owned heap storage. When `ndtbl_ENABLE_MMAP=ON`, supported POSIX builds use read-only memory mapping instead, which can reduce heap usage for large tables and enables shared memory access in multi-process environments. On Linux, `ndtbl_ENABLE_MMAP_POPULATE=ON` adds `MAP_POPULATE` to the mapping flags so the kernel faults the mapped payload in during `mmap()` instead of on first access.
 
@@ -83,11 +80,13 @@ When `ndtbl_ENABLE_MMAP_DIAGNOSTICS=ON`, mmap-loaded field groups can report OS 
 ```cpp
 const auto info = group.payload_residency();
 if (info.available) {
-  // inspect info.resident_pages, info.total_pages, info.resident_fraction
+  // mincore: info.resident_pages, info.total_pages, info.resident_fraction
+  // mapping: info.smaps_rss_bytes, info.smaps_locked_bytes, lock flags
+  // process: info.process_vmlck_bytes
 }
 ```
 
-The diagnostic is page-granular: it reports what `mincore` exposes for the mapped payload pages, not exact application RSS or exact bytes touched.
+The fields have three different scopes. The `resident_*` fields are the page-granular `mincore` view of the requested payload range. The `smaps_*` fields describe the complete Linux mapping containing the payload, including its RSS, `Locked` bytes, and the `VmFlags` lock flags (`lo` for locking and `lf` for lock-on-fault). The `process_vmlck_*` fields report process-wide `VmLck` from `/proc/self/status`. In lazy `MLOCK_ONFAULT` mode, `VmLck` can account for the complete lock-enabled range while the mapping's `Locked` bytes increase only as pages become resident. Availability flags accompany the [Linux `/proc`](https://docs.kernel.org/filesystems/proc.html) measurements so restricted or unavailable proc files are not reported as zero. Diagnostic mode may substantially increase runtime, depending on the application, and is therefore intended only for debugging.
 
 If you want to install the C++ headers and CMake package metadata:
 

@@ -106,18 +106,46 @@ parse_smaps_header(const std::string& line,
   return true;
 }
 
-inline std::size_t
-parse_smaps_kib(const std::string& line, const char* key)
+inline bool
+parse_proc_kib(const std::string& line,
+               const char* key,
+               std::size_t& value_bytes)
 {
   const std::string key_string(key);
   if (line.compare(0, key_string.size(), key_string) != 0) {
-    return 0;
+    return false;
   }
 
   std::istringstream is(line.substr(key_string.size()));
   std::size_t value_kib = 0;
-  is >> value_kib;
-  return value_kib;
+  if (!(is >> value_kib) ||
+      value_kib > std::numeric_limits<std::size_t>::max() / 1024) {
+    return false;
+  }
+
+  value_bytes = value_kib * 1024;
+  return true;
+}
+
+inline bool
+parse_smaps_vm_flags(const std::string& line,
+                     bool& lock_enabled,
+                     bool& lock_on_fault)
+{
+  const std::string key("VmFlags:");
+  if (line.compare(0, key.size(), key) != 0) {
+    return false;
+  }
+
+  lock_enabled = false;
+  lock_on_fault = false;
+  std::istringstream flags(line.substr(key.size()));
+  std::string flag;
+  while (flags >> flag) {
+    lock_enabled = lock_enabled || flag == "lo";
+    lock_on_fault = lock_on_fault || flag == "lf";
+  }
+  return true;
 }
 
 inline void
@@ -157,42 +185,69 @@ query_smaps_mapping(const void* address, residency_info& info)
       continue;
     }
 
-    const std::size_t rss_kib = parse_smaps_kib(line, "Rss:");
-    if (rss_kib != 0) {
-      info.smaps_rss_bytes = rss_kib * 1024;
+    std::size_t value_bytes = 0;
+    if (parse_proc_kib(line, "Rss:", value_bytes)) {
+      info.smaps_rss_bytes = value_bytes;
       continue;
     }
 
-    const std::size_t pss_kib = parse_smaps_kib(line, "Pss:");
-    if (pss_kib != 0) {
-      info.smaps_pss_bytes = pss_kib * 1024;
+    if (parse_proc_kib(line, "Pss:", value_bytes)) {
+      info.smaps_pss_bytes = value_bytes;
       continue;
     }
 
-    const std::size_t shared_clean_kib = parse_smaps_kib(line, "Shared_Clean:");
-    if (shared_clean_kib != 0) {
-      info.smaps_shared_clean_bytes = shared_clean_kib * 1024;
+    if (parse_proc_kib(line, "Shared_Clean:", value_bytes)) {
+      info.smaps_shared_clean_bytes = value_bytes;
       continue;
     }
 
-    const std::size_t shared_dirty_kib = parse_smaps_kib(line, "Shared_Dirty:");
-    if (shared_dirty_kib != 0) {
-      info.smaps_shared_dirty_bytes = shared_dirty_kib * 1024;
+    if (parse_proc_kib(line, "Shared_Dirty:", value_bytes)) {
+      info.smaps_shared_dirty_bytes = value_bytes;
       continue;
     }
 
-    const std::size_t private_clean_kib =
-      parse_smaps_kib(line, "Private_Clean:");
-    if (private_clean_kib != 0) {
-      info.smaps_private_clean_bytes = private_clean_kib * 1024;
+    if (parse_proc_kib(line, "Private_Clean:", value_bytes)) {
+      info.smaps_private_clean_bytes = value_bytes;
       continue;
     }
 
-    const std::size_t private_dirty_kib =
-      parse_smaps_kib(line, "Private_Dirty:");
-    if (private_dirty_kib != 0) {
-      info.smaps_private_dirty_bytes = private_dirty_kib * 1024;
+    if (parse_proc_kib(line, "Private_Dirty:", value_bytes)) {
+      info.smaps_private_dirty_bytes = value_bytes;
       continue;
+    }
+
+    if (parse_proc_kib(line, "Locked:", value_bytes)) {
+      info.smaps_locked_available = true;
+      info.smaps_locked_bytes = value_bytes;
+      continue;
+    }
+
+    bool lock_enabled = false;
+    bool lock_on_fault = false;
+    if (parse_smaps_vm_flags(line, lock_enabled, lock_on_fault)) {
+      info.smaps_vm_flags_available = true;
+      info.smaps_lock_enabled = lock_enabled;
+      info.smaps_lock_on_fault = lock_on_fault;
+      continue;
+    }
+  }
+}
+
+inline void
+query_process_vmlck(residency_info& info)
+{
+  std::ifstream status("/proc/self/status");
+  if (!status.is_open()) {
+    return;
+  }
+
+  std::string line;
+  while (std::getline(status, line)) {
+    std::size_t value_bytes = 0;
+    if (parse_proc_kib(line, "VmLck:", value_bytes)) {
+      info.process_vmlck_available = true;
+      info.process_vmlck_bytes = value_bytes;
+      return;
     }
   }
 }
@@ -252,6 +307,7 @@ query_residency(const void* address, std::size_t length)
     static_cast<double>(resident_pages) / static_cast<double>(total_pages);
 
   query_smaps_mapping(address, info);
+  query_process_vmlck(info);
 
   return info;
 }

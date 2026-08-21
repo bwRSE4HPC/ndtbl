@@ -221,6 +221,17 @@ TEST_CASE("payload residency reports availability for supported storage",
   REQUIRE(info.resident_bytes == info.resident_pages * info.page_size);
   REQUIRE(info.resident_fraction >= 0.0);
   REQUIRE(info.resident_fraction <= 1.0);
+  REQUIRE(info.smaps_available);
+  REQUIRE(info.smaps_locked_available);
+  REQUIRE(info.smaps_vm_flags_available);
+  REQUIRE(info.process_vmlck_available);
+#if NDTBL_ENABLE_MMAP_LOCK
+  REQUIRE(info.smaps_lock_enabled);
+#else
+  REQUIRE_FALSE(info.smaps_lock_enabled);
+  REQUIRE_FALSE(info.smaps_lock_on_fault);
+  REQUIRE(info.smaps_locked_bytes == 0);
+#endif
 
   REQUIRE(runtime_info.available);
   REQUIRE(runtime_info.page_size > 0);
@@ -235,6 +246,43 @@ TEST_CASE("payload residency reports availability for supported storage",
 
   std::remove(path.c_str());
 }
+
+#if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+
+TEST_CASE("Linux proc memory diagnostic fields are parsed explicitly",
+          "[io][mmap][diagnostics]")
+{
+  std::size_t value_bytes = 1;
+  REQUIRE(ndtbl::detail::parse_proc_kib(
+    "Locked:                0 kB", "Locked:", value_bytes));
+  REQUIRE(value_bytes == 0);
+  REQUIRE(ndtbl::detail::parse_proc_kib(
+    "VmLck:\t      17 kB", "VmLck:", value_bytes));
+  REQUIRE(value_bytes == 17 * 1024);
+  REQUIRE_FALSE(
+    ndtbl::detail::parse_proc_kib("Rss: 4 kB", "Locked:", value_bytes));
+
+  bool lock_enabled = false;
+  bool lock_on_fault = false;
+  REQUIRE(ndtbl::detail::parse_smaps_vm_flags(
+    "VmFlags: rd wr mr mw me lo lf ac sd", lock_enabled, lock_on_fault));
+  REQUIRE(lock_enabled);
+  REQUIRE(lock_on_fault);
+
+  REQUIRE(ndtbl::detail::parse_smaps_vm_flags(
+    "VmFlags: rd mr me lo sd", lock_enabled, lock_on_fault));
+  REQUIRE(lock_enabled);
+  REQUIRE_FALSE(lock_on_fault);
+
+  REQUIRE(ndtbl::detail::parse_smaps_vm_flags(
+    "VmFlags: rd mr me sd", lock_enabled, lock_on_fault));
+  REQUIRE_FALSE(lock_enabled);
+  REQUIRE_FALSE(lock_on_fault);
+  REQUIRE_FALSE(ndtbl::detail::parse_smaps_vm_flags(
+    "Locked: 4 kB", lock_enabled, lock_on_fault));
+}
+
+#endif
 
 #if NDTBL_ENABLE_MMAP_LOCK && defined(__linux__)
 
@@ -259,17 +307,40 @@ TEST_CASE("mmap locking follows the configured population policy",
 
   REQUIRE(ndtbl::detail::lock_mapping_pages(mapping, mapping_length) == 0);
   REQUIRE(mincore(mapping, mapping_length, resident.data()) == 0);
+#if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+  ndtbl::residency_info lock_info =
+    ndtbl::detail::query_residency(mapping, mapping_length);
+  REQUIRE(lock_info.smaps_available);
+  REQUIRE(lock_info.smaps_locked_available);
+  REQUIRE(lock_info.smaps_vm_flags_available);
+  REQUIRE(lock_info.smaps_lock_enabled);
+  REQUIRE(lock_info.process_vmlck_available);
+  REQUIRE(lock_info.process_vmlck_bytes >= mapping_length);
+#endif
 #if NDTBL_ENABLE_MMAP_POPULATE
   REQUIRE((resident[0] & 1U) != 0U);
   REQUIRE((resident[1] & 1U) != 0U);
+#if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+  REQUIRE_FALSE(lock_info.smaps_lock_on_fault);
+  REQUIRE(lock_info.smaps_locked_bytes >= mapping_length);
+#endif
 #else
   REQUIRE((resident[0] & 1U) == 0U);
   REQUIRE((resident[1] & 1U) == 0U);
+#if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+  REQUIRE(lock_info.smaps_lock_on_fault);
+  REQUIRE(lock_info.smaps_locked_bytes == 0);
+#endif
 
   static_cast<volatile unsigned char*>(mapping)[0] = 1;
   REQUIRE(mincore(mapping, mapping_length, resident.data()) == 0);
   REQUIRE((resident[0] & 1U) != 0U);
   REQUIRE((resident[1] & 1U) == 0U);
+#if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+  lock_info = ndtbl::detail::query_residency(mapping, mapping_length);
+  REQUIRE(lock_info.smaps_locked_bytes >= static_cast<std::size_t>(page_size));
+  REQUIRE(lock_info.smaps_locked_bytes < mapping_length);
+#endif
 #endif
 
   REQUIRE(munmap(mapping, mapping_length) == 0);
