@@ -51,6 +51,7 @@ static constexpr std::uint8_t current_format_version = 1u;
  * Only `float` and `double` are supported in the current implementation.
  *
  * @tparam Stored Supported scalar payload type.
+ *
  * @return Corresponding ndtbl scalar type tag.
  */
 template<class Stored>

@@ -23,6 +23,7 @@ namespace detail {
  *
  * @param base Base value.
  * @param exponent Non-negative exponent.
+ *
  * @return `base` raised to `exponent`.
  */
 constexpr std::size_t
@@ -77,6 +78,7 @@ public:
    * @brief Return the flat storage index by stencil point index.
    *
    * @param index Stencil point index.
+   *
    * @return Flat point index of the selected stencil point.
    */
   std::size_t point_index(std::size_t index) const
@@ -95,6 +97,7 @@ public:
    * @brief Return the interpolation weight by stencil point index.
    *
    * @param index Stencil point index.
+   *
    * @return Interpolation weight for the selected stencil point.
    */
   double weight(std::size_t index) const { return weights_[index]; }
@@ -185,6 +188,7 @@ public:
    * @brief Return one axis descriptor by dimension index.
    *
    * @param index Dimension index.
+   *
    * @return Axis descriptor for the selected dimension.
    */
   const Axis& axis(std::size_t index) const { return axes_[index]; }
@@ -200,6 +204,7 @@ public:
    * @brief Return the extent by dimension index.
    *
    * @param index Dimension index.
+   *
    * @return Number of support points along the selected dimension.
    */
   std::size_t extent(std::size_t index) const { return extents_[index]; }
@@ -215,6 +220,7 @@ public:
    * @brief Return the flat-memory stride by dimension index.
    *
    * @param index Dimension index.
+   *
    * @return Flat-memory stride for the selected dimension.
    */
   std::size_t stride(std::size_t index) const { return strides_[index]; }
@@ -234,6 +240,7 @@ public:
    *
    * @param coordinates Query coordinates in axis order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
+   *
    * @return Linear stencil containing point indices and weights.
    */
   LinearStencil<Dim> prepare_linear(
@@ -303,6 +310,7 @@ public:
    *
    * @param coordinates Query coordinates in axis order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
+   *
    * @return Cubic stencil containing flattened table point indices and
    * tensor-product weights.
    *
