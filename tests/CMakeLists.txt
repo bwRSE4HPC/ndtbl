@@ -8,7 +8,8 @@ if(NOT TARGET Catch2::Catch2WithMain)
   FetchContent_Declare(
     Catch2
     GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-    GIT_TAG v3.15.2)
+    GIT_TAG v3.16.0
+  )
 
   FetchContent_MakeAvailable(Catch2)
 endif()
