@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/pypi/l/ndtbl?label=License)](https://opensource.org/licenses/MIT)
 [![Build](https://github.com/bwrse4hpc/ndtbl/actions/workflows/ci.yml/badge.svg)](https://github.com/bwrse4hpc/ndtbl/actions)
 [![Documentation](https://readthedocs.org/projects/ndtbl/badge/)](https://ndtbl.readthedocs.io/)
-[![codecov](https://codecov.io/gh/thomasisensee/ndtbl/graph/badge.svg?flag=cpp&token=5N4GQ0YP7I)](https://codecov.io/gh/thomasisensee/ndtbl)
+[![codecov](https://codecov.io/gh/bwRSE4HPC/ndtbl/graph/badge.svg?flag=cpp&token=5N4GQ0YP7I)](https://codecov.io/gh/bwRSE4HPC/ndtbl)
 [![pre-commit.ci](https://results.pre-commit.ci/badge/github/bwrse4hpc/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/bwrse4hpc/ndtbl/main)
 [![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=bwrse4hpc_ndtbl&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bwrse4hpc_ndtbl)
 [![C++](https://img.shields.io/badge/C%2B%2B-14-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B#Standardization)
