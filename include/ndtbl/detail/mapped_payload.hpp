@@ -10,6 +10,10 @@
 #define NDTBL_ENABLE_MMAP_POPULATE 0
 #endif
 
+#ifndef NDTBL_ENABLE_MMAP_LOCK
+#define NDTBL_ENABLE_MMAP_LOCK 0
+#endif
+
 #ifndef NDTBL_ENABLE_MMAP_DIAGNOSTICS
 #define NDTBL_ENABLE_MMAP_DIAGNOSTICS 0
 #endif
@@ -47,6 +51,12 @@
 #endif
 #endif
 
+#if NDTBL_ENABLE_MMAP_LOCK
+#if !NDTBL_ENABLE_MMAP
+#error "NDTBL_ENABLE_MMAP_LOCK requires NDTBL_ENABLE_MMAP"
+#endif
+#endif
+
 #if NDTBL_ENABLE_MMAP_POPULATE
 #if !NDTBL_ENABLE_MMAP
 #error "NDTBL_ENABLE_MMAP_POPULATE requires NDTBL_ENABLE_MMAP"
@@ -62,6 +72,12 @@
 namespace ndtbl {
 namespace detail {
 
+/**
+ * @brief Return the default result used when residency diagnostics are
+ * disabled.
+ *
+ * @return Residency information with all availability flags clear.
+ */
 inline residency_info
 unavailable_residency()
 {
@@ -70,6 +86,14 @@ unavailable_residency()
 
 #if NDTBL_ENABLE_MMAP
 
+/**
+ * @brief Append the current errno description to an operation-specific
+ * message.
+ *
+ * @param[in] prefix Description of the operation that failed.
+ *
+ * @return The supplied prefix followed by the current errno description.
+ */
 inline std::string
 system_error_message(const std::string& prefix)
 {
@@ -80,6 +104,16 @@ system_error_message(const std::string& prefix)
 
 #if NDTBL_ENABLE_MMAP_DIAGNOSTICS
 
+/**
+ * @brief Parse the address range at the beginning of a Linux smaps mapping
+ * header.
+ *
+ * @param[in] line Candidate line from `/proc/self/smaps`.
+ * @param[out] start Receives the inclusive mapping start address.
+ * @param[out] end Receives the exclusive mapping end address.
+ *
+ * @return True when the line begins with a valid address range.
+ */
 inline bool
 parse_smaps_header(const std::string& line,
                    std::uintptr_t& start,
@@ -96,20 +130,83 @@ parse_smaps_header(const std::string& line,
   return true;
 }
 
-inline std::size_t
-parse_smaps_kib(const std::string& line, const char* key)
+/**
+ * @brief Parse a KiB-valued Linux proc field and convert it to bytes.
+ *
+ * A valid zero is distinguished from a missing or malformed field through the
+ * return value. The output is left unchanged when parsing fails.
+ *
+ * @param[in] line Candidate line from a proc status file.
+ * @param[in] key Field name including its trailing colon, for example `"Rss:"`.
+ * @param[out] value_bytes Receives the converted byte count.
+ *
+ * @return True when the requested field was parsed without overflow.
+ */
+inline bool
+parse_proc_kib(const std::string& line,
+               const char* key,
+               std::size_t& value_bytes)
 {
   const std::string key_string(key);
   if (line.compare(0, key_string.size(), key_string) != 0) {
-    return 0;
+    return false;
   }
 
   std::istringstream is(line.substr(key_string.size()));
   std::size_t value_kib = 0;
-  is >> value_kib;
-  return value_kib;
+  if (!(is >> value_kib) ||
+      value_kib > std::numeric_limits<std::size_t>::max() / 1024) {
+    return false;
+  }
+
+  value_bytes = value_kib * 1024;
+  return true;
 }
 
+/**
+ * @brief Extract the Linux mapping lock flags from an smaps `VmFlags` line.
+ *
+ * `lo` denotes a lock-enabled mapping and `lf` denotes lock-on-fault. A
+ * matching `VmFlags` line without either token is still a successful parse.
+ *
+ * @param[in] line Candidate line from `/proc/self/smaps`.
+ * @param[out] lock_enabled Receives whether the `lo` token is present.
+ * @param[out] lock_on_fault Receives whether the `lf` token is present.
+ *
+ * @return True when @p line is a `VmFlags` line.
+ */
+inline bool
+parse_smaps_vm_flags(const std::string& line,
+                     bool& lock_enabled,
+                     bool& lock_on_fault)
+{
+  const std::string key("VmFlags:");
+  if (line.compare(0, key.size(), key) != 0) {
+    return false;
+  }
+
+  lock_enabled = false;
+  lock_on_fault = false;
+  std::istringstream flags(line.substr(key.size()));
+  std::string flag;
+  while (flags >> flag) {
+    lock_enabled = lock_enabled || flag == "lo";
+    lock_on_fault = lock_on_fault || flag == "lf";
+  }
+  return true;
+}
+
+/**
+ * @brief Add mapping-scoped Linux smaps measurements for the supplied address.
+ *
+ * This locates the single virtual-memory mapping containing @p address and
+ * records its size, RSS/PSS breakdown, locked bytes, and lock flags. Failure
+ * to open smaps or locate the mapping is represented by availability fields;
+ * it is not an error in the independent mincore query.
+ *
+ * @param[in] address Address whose containing mapping is inspected.
+ * @param[in,out] info Residency result to extend with mapping information.
+ */
 inline void
 query_smaps_mapping(const void* address, residency_info& info)
 {
@@ -147,46 +244,99 @@ query_smaps_mapping(const void* address, residency_info& info)
       continue;
     }
 
-    const std::size_t rss_kib = parse_smaps_kib(line, "Rss:");
-    if (rss_kib != 0) {
-      info.smaps_rss_bytes = rss_kib * 1024;
+    std::size_t value_bytes = 0;
+    if (parse_proc_kib(line, "Rss:", value_bytes)) {
+      info.smaps_rss_bytes = value_bytes;
       continue;
     }
 
-    const std::size_t pss_kib = parse_smaps_kib(line, "Pss:");
-    if (pss_kib != 0) {
-      info.smaps_pss_bytes = pss_kib * 1024;
+    if (parse_proc_kib(line, "Pss:", value_bytes)) {
+      info.smaps_pss_bytes = value_bytes;
       continue;
     }
 
-    const std::size_t shared_clean_kib = parse_smaps_kib(line, "Shared_Clean:");
-    if (shared_clean_kib != 0) {
-      info.smaps_shared_clean_bytes = shared_clean_kib * 1024;
+    if (parse_proc_kib(line, "Shared_Clean:", value_bytes)) {
+      info.smaps_shared_clean_bytes = value_bytes;
       continue;
     }
 
-    const std::size_t shared_dirty_kib = parse_smaps_kib(line, "Shared_Dirty:");
-    if (shared_dirty_kib != 0) {
-      info.smaps_shared_dirty_bytes = shared_dirty_kib * 1024;
+    if (parse_proc_kib(line, "Shared_Dirty:", value_bytes)) {
+      info.smaps_shared_dirty_bytes = value_bytes;
       continue;
     }
 
-    const std::size_t private_clean_kib =
-      parse_smaps_kib(line, "Private_Clean:");
-    if (private_clean_kib != 0) {
-      info.smaps_private_clean_bytes = private_clean_kib * 1024;
+    if (parse_proc_kib(line, "Private_Clean:", value_bytes)) {
+      info.smaps_private_clean_bytes = value_bytes;
       continue;
     }
 
-    const std::size_t private_dirty_kib =
-      parse_smaps_kib(line, "Private_Dirty:");
-    if (private_dirty_kib != 0) {
-      info.smaps_private_dirty_bytes = private_dirty_kib * 1024;
+    if (parse_proc_kib(line, "Private_Dirty:", value_bytes)) {
+      info.smaps_private_dirty_bytes = value_bytes;
+      continue;
+    }
+
+    if (parse_proc_kib(line, "Locked:", value_bytes)) {
+      info.smaps_locked_available = true;
+      info.smaps_locked_bytes = value_bytes;
+      continue;
+    }
+
+    bool lock_enabled = false;
+    bool lock_on_fault = false;
+    if (parse_smaps_vm_flags(line, lock_enabled, lock_on_fault)) {
+      info.smaps_vm_flags_available = true;
+      info.smaps_lock_enabled = lock_enabled;
+      info.smaps_lock_on_fault = lock_on_fault;
       continue;
     }
   }
 }
 
+/**
+ * @brief Add the process-wide locked-memory total from `/proc/self/status`.
+ *
+ * `VmLck` includes all lock-enabled memory in the process, not only the table
+ * mapping being inspected. Unavailable or malformed proc data leaves the
+ * corresponding availability flag clear.
+ *
+ * @param[in,out] info Residency result to extend with process information.
+ */
+inline void
+query_process_vmlck(residency_info& info)
+{
+  std::ifstream status("/proc/self/status");
+  if (!status.is_open()) {
+    return;
+  }
+
+  std::string line;
+  while (std::getline(status, line)) {
+    std::size_t value_bytes = 0;
+    if (parse_proc_kib(line, "VmLck:", value_bytes)) {
+      info.process_vmlck_available = true;
+      info.process_vmlck_bytes = value_bytes;
+      return;
+    }
+  }
+}
+
+/**
+ * @brief Query page residency and related Linux memory information for a byte
+ * range.
+ *
+ * The range is expanded to whole pages for mincore. Mapping-scoped smaps data
+ * and process-scoped VmLck data are then attached when their proc files are
+ * available.
+ *
+ * @param[in] address First byte in the payload range.
+ * @param[in] length Number of payload bytes to inspect.
+ *
+ * @return Page-, mapping-, and process-scoped residency information.
+ *
+ * @throws std::invalid_argument for a null nonempty range.
+ * @throws std::overflow_error when page-range arithmetic would overflow.
+ * @throws IOError when the page size or mincore query fails.
+ */
 inline residency_info
 query_residency(const void* address, std::size_t length)
 {
@@ -242,15 +392,26 @@ query_residency(const void* address, std::size_t length)
     static_cast<double>(resident_pages) / static_cast<double>(total_pages);
 
   query_smaps_mapping(address, info);
+  query_process_vmlck(info);
 
   return info;
 }
 
 #else
 
+/**
+ * @brief Return an unavailable result in builds without mmap diagnostics.
+ *
+ * @param[in] address Unused payload address.
+ * @param[in] length Unused payload length.
+ *
+ * @return Residency information with all availability flags clear.
+ */
 inline residency_info
-query_residency(const void*, std::size_t)
+query_residency(const void* address, std::size_t length)
 {
+  static_cast<void>(address);
+  static_cast<void>(length);
   return unavailable_residency();
 }
 
@@ -258,9 +419,19 @@ query_residency(const void*, std::size_t)
 
 #if NDTBL_ENABLE_MMAP
 
+/**
+ * @brief RAII owner that unmaps a payload mapping when its shared lifetime
+ * ends.
+ */
 class mapped_payload_owner
 {
 public:
+  /**
+   * @brief Take ownership of an existing mmap mapping.
+   *
+   * @param[in] mapping Start address returned by mmap.
+   * @param[in] mapping_length Length of the complete mapping in bytes.
+   */
   mapped_payload_owner(void* mapping, std::size_t mapping_length)
     : mapping_(mapping)
     , mapping_length_(mapping_length)
@@ -270,6 +441,7 @@ public:
   mapped_payload_owner(const mapped_payload_owner&) = delete;
   mapped_payload_owner& operator=(const mapped_payload_owner&) = delete;
 
+  /** @brief Unmap the owned range, if any. */
   ~mapped_payload_owner()
   {
     if (mapping_ != nullptr && mapping_length_ != 0) {
@@ -282,6 +454,49 @@ private:
   std::size_t mapping_length_;
 };
 
+#if NDTBL_ENABLE_MMAP_LOCK
+
+/**
+ * @brief Apply the configured locking policy to a mapped payload.
+ *
+ * Linux lazy-loading builds use MLOCK_ONFAULT; eager Linux builds and other
+ * POSIX platforms use mlock. The return value and errno follow the selected
+ * system call.
+ *
+ * @param[in] mapping Start address of the mapping to lock.
+ * @param[in] mapping_length Number of mapped bytes to lock.
+ *
+ * @return Zero on success and -1 on failure.
+ */
+inline int
+lock_mapping_pages(const void* mapping, std::size_t mapping_length)
+{
+#if defined(__linux__) && !NDTBL_ENABLE_MMAP_POPULATE
+  return mlock2(mapping, mapping_length, MLOCK_ONFAULT);
+#else
+  return mlock(mapping, mapping_length);
+#endif
+}
+
+#endif
+
+/**
+ * @brief Map a payload subrange and return shared ownership of its first byte.
+ *
+ * The file offset is rounded down to a page boundary for mmap. The returned
+ * aliasing shared pointer retains the complete mapping through
+ * mapped_payload_owner, while pointing past any alignment prefix. Optional
+ * population and locking policies are applied before the pointer is returned.
+ *
+ * @param[in] path Path of the ndtbl file to map.
+ * @param[in] payload_offset Byte offset of the payload within the file.
+ * @param[in] payload_size Number of payload bytes to map.
+ *
+ * @return An empty pointer for an empty payload.
+ *
+ * @throws IOError for file, mapping, page-size, or locking failures.
+ * @throws FormatError when the payload range exceeds the file.
+ */
 inline std::shared_ptr<const std::uint8_t>
 map_payload_bytes(const std::string& path,
                   std::size_t payload_offset,
@@ -339,6 +554,15 @@ map_payload_bytes(const std::string& path,
     errno = saved_errno;
     throw IOError(system_error_message("failed to map ndtbl payload"));
   }
+
+#if NDTBL_ENABLE_MMAP_LOCK
+  if (lock_mapping_pages(mapping, mapping_length) != 0) {
+    const int saved_lock_errno = errno;
+    munmap(mapping, mapping_length);
+    errno = saved_lock_errno;
+    throw IOError(system_error_message("failed to lock ndtbl payload"));
+  }
+#endif
 
   const auto owner =
     std::make_shared<mapped_payload_owner>(mapping, mapping_length);

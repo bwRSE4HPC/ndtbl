@@ -17,6 +17,12 @@
 #include <type_traits>
 #include <vector>
 
+#if NDTBL_ENABLE_MMAP_LOCK && defined(__linux__)
+#include <sys/resource.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#endif
+
 static_assert(std::is_base_of<std::runtime_error, ndtbl::Error>::value,
               "ndtbl errors must expose the standard runtime-error API");
 static_assert(std::is_base_of<ndtbl::Error, ndtbl::FormatError>::value,
@@ -25,6 +31,39 @@ static_assert(std::is_base_of<ndtbl::Error, ndtbl::IOError>::value,
               "I/O errors must derive from the ndtbl error base");
 static_assert(std::is_base_of<ndtbl::Error, ndtbl::StateError>::value,
               "state errors must derive from the ndtbl error base");
+
+#if NDTBL_ENABLE_MMAP_LOCK && defined(__linux__)
+
+namespace {
+
+std::size_t
+locked_memory_kib()
+{
+  std::ifstream status("/proc/self/status");
+  if (!status.is_open()) {
+    throw std::runtime_error("failed to open /proc/self/status");
+  }
+
+  std::string line;
+  while (std::getline(status, line)) {
+    if (line.compare(0, 6, "VmLck:") != 0) {
+      continue;
+    }
+
+    std::istringstream value_stream(line.substr(6));
+    std::size_t value_kib = 0;
+    if (!(value_stream >> value_kib)) {
+      throw std::runtime_error("failed to parse VmLck");
+    }
+    return value_kib;
+  }
+
+  throw std::runtime_error("VmLck is missing from /proc/self/status");
+}
+
+} // namespace
+
+#endif
 
 TEST_CASE("ndtbl exceptions preserve messages and support base catches",
           "[exceptions]")
@@ -182,6 +221,17 @@ TEST_CASE("payload residency reports availability for supported storage",
   REQUIRE(info.resident_bytes == info.resident_pages * info.page_size);
   REQUIRE(info.resident_fraction >= 0.0);
   REQUIRE(info.resident_fraction <= 1.0);
+  REQUIRE(info.smaps_available);
+  REQUIRE(info.smaps_locked_available);
+  REQUIRE(info.smaps_vm_flags_available);
+  REQUIRE(info.process_vmlck_available);
+#if NDTBL_ENABLE_MMAP_LOCK
+  REQUIRE(info.smaps_lock_enabled);
+#else
+  REQUIRE_FALSE(info.smaps_lock_enabled);
+  REQUIRE_FALSE(info.smaps_lock_on_fault);
+  REQUIRE(info.smaps_locked_bytes == 0);
+#endif
 
   REQUIRE(runtime_info.available);
   REQUIRE(runtime_info.page_size > 0);
@@ -196,6 +246,179 @@ TEST_CASE("payload residency reports availability for supported storage",
 
   std::remove(path.c_str());
 }
+
+#if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+
+TEST_CASE("Linux proc memory diagnostic fields are parsed explicitly",
+          "[io][mmap][diagnostics]")
+{
+  std::size_t value_bytes = 1;
+  REQUIRE(ndtbl::detail::parse_proc_kib(
+    "Locked:                0 kB", "Locked:", value_bytes));
+  REQUIRE(value_bytes == 0);
+  REQUIRE(ndtbl::detail::parse_proc_kib(
+    "VmLck:\t      17 kB", "VmLck:", value_bytes));
+  REQUIRE(value_bytes == 17 * 1024);
+  REQUIRE_FALSE(
+    ndtbl::detail::parse_proc_kib("Rss: 4 kB", "Locked:", value_bytes));
+
+  bool lock_enabled = false;
+  bool lock_on_fault = false;
+  REQUIRE(ndtbl::detail::parse_smaps_vm_flags(
+    "VmFlags: rd wr mr mw me lo lf ac sd", lock_enabled, lock_on_fault));
+  REQUIRE(lock_enabled);
+  REQUIRE(lock_on_fault);
+
+  REQUIRE(ndtbl::detail::parse_smaps_vm_flags(
+    "VmFlags: rd mr me lo sd", lock_enabled, lock_on_fault));
+  REQUIRE(lock_enabled);
+  REQUIRE_FALSE(lock_on_fault);
+
+  REQUIRE(ndtbl::detail::parse_smaps_vm_flags(
+    "VmFlags: rd mr me sd", lock_enabled, lock_on_fault));
+  REQUIRE_FALSE(lock_enabled);
+  REQUIRE_FALSE(lock_on_fault);
+  REQUIRE_FALSE(ndtbl::detail::parse_smaps_vm_flags(
+    "Locked: 4 kB", lock_enabled, lock_on_fault));
+}
+
+#endif
+
+#if NDTBL_ENABLE_MMAP_LOCK && defined(__linux__)
+
+TEST_CASE("mmap locking follows the configured population policy",
+          "[io][mmap][lock]")
+{
+  const long page_size = sysconf(_SC_PAGESIZE);
+  REQUIRE(page_size > 0);
+  const auto mapping_length = static_cast<std::size_t>(page_size) * 2;
+  void* const mapping = mmap(nullptr,
+                             mapping_length,
+                             PROT_READ | PROT_WRITE,
+                             MAP_PRIVATE | MAP_ANONYMOUS,
+                             -1,
+                             0);
+  REQUIRE(mapping != MAP_FAILED);
+
+  std::array<unsigned char, 2> resident = { 0, 0 };
+  REQUIRE(mincore(mapping, mapping_length, resident.data()) == 0);
+  REQUIRE((resident[0] & 1U) == 0U);
+  REQUIRE((resident[1] & 1U) == 0U);
+
+  REQUIRE(ndtbl::detail::lock_mapping_pages(mapping, mapping_length) == 0);
+  REQUIRE(mincore(mapping, mapping_length, resident.data()) == 0);
+#if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+  ndtbl::residency_info lock_info =
+    ndtbl::detail::query_residency(mapping, mapping_length);
+  REQUIRE(lock_info.smaps_available);
+  REQUIRE(lock_info.smaps_locked_available);
+  REQUIRE(lock_info.smaps_vm_flags_available);
+  REQUIRE(lock_info.smaps_lock_enabled);
+  REQUIRE(lock_info.process_vmlck_available);
+  REQUIRE(lock_info.process_vmlck_bytes >= mapping_length);
+#endif
+#if NDTBL_ENABLE_MMAP_POPULATE
+  REQUIRE((resident[0] & 1U) != 0U);
+  REQUIRE((resident[1] & 1U) != 0U);
+#if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+  REQUIRE_FALSE(lock_info.smaps_lock_on_fault);
+  REQUIRE(lock_info.smaps_locked_bytes >= mapping_length);
+#endif
+#else
+  REQUIRE((resident[0] & 1U) == 0U);
+  REQUIRE((resident[1] & 1U) == 0U);
+#if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+  REQUIRE(lock_info.smaps_lock_on_fault);
+  REQUIRE(lock_info.smaps_locked_bytes == 0);
+#endif
+
+  static_cast<volatile unsigned char*>(mapping)[0] = 1;
+  REQUIRE(mincore(mapping, mapping_length, resident.data()) == 0);
+  REQUIRE((resident[0] & 1U) != 0U);
+  REQUIRE((resident[1] & 1U) == 0U);
+#if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+  lock_info = ndtbl::detail::query_residency(mapping, mapping_length);
+  REQUIRE(lock_info.smaps_locked_bytes >= static_cast<std::size_t>(page_size));
+  REQUIRE(lock_info.smaps_locked_bytes < mapping_length);
+#endif
+#endif
+
+  REQUIRE(munmap(mapping, mapping_length) == 0);
+}
+
+TEST_CASE("mmap locking holds payload pages for the loaded group lifetime",
+          "[io][mmap][lock]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 2.0, 4.0 });
+
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, group);
+
+  const std::size_t locked_before_kib = locked_memory_kib();
+  {
+    const ndtbl::FieldGroup<1, double> loaded =
+      ndtbl::read_field_group<1, double>(path);
+    std::array<double, 1> values = { 0.0 };
+    loaded.evaluate_all_linear_into({ 0.5 }, values.data());
+
+    REQUIRE(values[0] == Catch::Approx(3.0));
+    REQUIRE(locked_memory_kib() > locked_before_kib);
+  }
+  REQUIRE(locked_memory_kib() == locked_before_kib);
+
+  std::remove(path.c_str());
+}
+
+TEST_CASE("mmap locking reports memlock limit failures as I/O errors",
+          "[io][mmap][lock]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 2.0, 4.0 });
+
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, group);
+
+  const pid_t child = fork();
+  REQUIRE(child >= 0);
+  if (child == 0) {
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_MEMLOCK, &limit) != 0) {
+      _exit(2);
+    }
+    limit.rlim_cur = 0;
+    if (setrlimit(RLIMIT_MEMLOCK, &limit) != 0) {
+      _exit(3);
+    }
+
+    try {
+      const ndtbl::FieldGroup<1, double> loaded =
+        ndtbl::read_field_group<1, double>(path);
+      static_cast<void>(loaded);
+    } catch (const ndtbl::IOError&) {
+      _exit(0);
+    } catch (...) {
+      _exit(4);
+    }
+    _exit(5);
+  }
+
+  int child_status = 0;
+  const pid_t waited_child = waitpid(child, &child_status, 0);
+  std::remove(path.c_str());
+
+  REQUIRE(waited_child == child);
+  REQUIRE(WIFEXITED(child_status));
+  REQUIRE(WEXITSTATUS(child_status) == 0);
+}
+
+#endif
 
 TEST_CASE("typed field group loader rejects wrong scalar type", "[io]")
 {

@@ -1,10 +1,10 @@
 # ndtbl
 
 [![License](https://img.shields.io/pypi/l/ndtbl?label=License)](https://opensource.org/licenses/MIT)
-[![Build](https://github.com/thomasisensee/ndtbl/actions/workflows/ci.yml/badge.svg)](https://github.com/thomasisensee/ndtbl/actions)
+[![Build](https://github.com/bwrse4hpc/ndtbl/actions/workflows/ci.yml/badge.svg)](https://github.com/bwrse4hpc/ndtbl/actions)
 [![Documentation](https://readthedocs.org/projects/ndtbl/badge/)](https://ndtbl.readthedocs.io/)
 [![codecov](https://codecov.io/gh/thomasisensee/ndtbl/graph/badge.svg?flag=cpp&token=5N4GQ0YP7I)](https://codecov.io/gh/thomasisensee/ndtbl)
-[![pre-commit.ci](https://results.pre-commit.ci/badge/github/thomasisensee/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/thomasisensee/ndtbl/main)
+[![pre-commit.ci](https://results.pre-commit.ci/badge/github/bwrse4hpc/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/bwrse4hpc/ndtbl/main)
 [![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=bwrse4hpc_ndtbl&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bwrse4hpc_ndtbl)
 [![C++](https://img.shields.io/badge/C%2B%2B-14-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B#Standardization)
 
@@ -16,8 +16,7 @@ This repository currently contains two user-facing parts:
 - a separate [pure-Python package](https://pypi.org/project/ndtbl/) in `python/ndtbl/` for reading,
 writing, inspecting, querying, and generating `.ndtbl` files
 
-The C++ reader can also be built with optional POSIX `mmap` memory mapping support so payloads
-can stay file-backed instead of always being copied into heap memory entirely.
+The C++ reader can also be built with optional POSIX `mmap` memory mapping support so payloads can stay file-backed instead of always being copied into heap memory entirely.
 
 ## 🗂️ Layout
 
@@ -33,7 +32,7 @@ can stay file-backed instead of always being copied into heap memory entirely.
 
 Use the C++ library when you want to integrate `ndtbl`'s lookup logic directly into a C++ application.
 
-Use the Python package when you want a pip-installable Python interface for creating `.ndtbl` files from NumPy arrays, inspecting existing `.ndtbl` files, or running queries against them. The Python package also provides a convenient CLI for inspecting, querying, and generating `.ndtbl` files. See [`python/ndtbl/README.md`](https://github.com/thomasisensee/ndtbl/tree/main/python/ndtbl) for Python package details.
+Use the Python package when you want a pip-installable Python interface for creating `.ndtbl` files from NumPy arrays, inspecting existing `.ndtbl` files, or running queries against them. The Python package also provides a convenient CLI for inspecting, querying, and generating `.ndtbl` files. See [`python/ndtbl/README.md`](https://github.com/bwrse4hpc/ndtbl/tree/main/python/ndtbl) for Python package details.
 
 If you want to inspect `.ndtbl`files with a C++ command-line tool, use the C++ `ndtbl-inspect` executable built from `app/`. It is not prebuilt; it becomes available only after running the local CMake build.
 
@@ -66,31 +65,28 @@ Relevant CMake options:
 - `ndtbl_BUILD_BENCHMARKS`: build developer lookup benchmarks, default `OFF`
 - `ndtbl_BUILD_DOCS`: build the documentation, default `ON` for top-level builds
 - `ndtbl_ENABLE_MMAP`: enable POSIX-only `mmap`-backed payload reads, default `OFF`
-- `ndtbl_ENABLE_MMAP_POPULATE`: add Linux-only `MAP_POPULATE` to `mmap`-backed
-  payload reads, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
-- `ndtbl_ENABLE_MMAP_DIAGNOSTICS`: enable mmap payload residency diagnostics
-  through `mincore`, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
+- `ndtbl_ENABLE_MMAP_POPULATE`: add Linux-only `MAP_POPULATE` to `mmap`-backed payload reads, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
+- `ndtbl_ENABLE_MMAP_LOCK`: lock `mmap`-backed payload pages in memory, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
+- `ndtbl_ENABLE_MMAP_DIAGNOSTICS`: enable mmap payload residency diagnostics through `mincore` and Linux `/proc`, default `OFF`; requires `ndtbl_ENABLE_MMAP=ON`
 
-When `ndtbl_ENABLE_MMAP=OFF` (the default), `read_field_group()` and
-`read_runtime_field_group()` read payload data into owned heap storage. When
-`ndtbl_ENABLE_MMAP=ON`, supported POSIX builds use read-only memory mapping
-instead, which can reduce heap usage for large tables and enables shared memory
-access in multi-process environments. On Linux, `ndtbl_ENABLE_MMAP_POPULATE=ON`
-adds `MAP_POPULATE` to the mapping flags so the kernel faults the mapped payload
-in during `mmap()` instead of on first access.
+When `ndtbl_ENABLE_MMAP=OFF` (the default), `read_field_group()` and `read_runtime_field_group()` read payload data into owned heap storage. When `ndtbl_ENABLE_MMAP=ON`, supported POSIX builds use read-only memory mapping instead, which can reduce heap usage for large tables and enables shared memory access in multi-process environments. On Linux, `ndtbl_ENABLE_MMAP_POPULATE=ON` adds `MAP_POPULATE` to the mapping flags so the kernel faults the mapped payload in during `mmap()` instead of on first access.
 
-When `ndtbl_ENABLE_MMAP_DIAGNOSTICS=ON`, mmap-loaded field groups can report OS
-page residency for their payload:
+When `ndtbl_ENABLE_MMAP_LOCK=ON`, each mapped payload is locked for the lifetime of the mapping. On Linux, locking without `ndtbl_ENABLE_MMAP_POPULATE` uses `mlock2(..., MLOCK_ONFAULT)`: pages remain nonresident until first access and stay locked afterward. This lazy locking mode requires Linux 4.4 or newer and system headers and a C library that expose `mlock2()` and `MLOCK_ONFAULT`. Enabling both locking and population uses `mlock()` after `MAP_POPULATE`, so the complete mapping is resident when loading returns. Other POSIX platforms always use `mlock()`. Loading fails with an `ndtbl::IOError` if the selected locking operation fails; there is no eager or unlocked fallback.
+
+Memory-lock limits apply per process. In an MPI run, every rank needs an `RLIMIT_MEMLOCK` allowance large enough for all mapped payloads and any memory already pinned by MPI or RDMA, even when Linux pages are locked only upon fault and even though file-backed physical pages can remain shared by ranks on the same node. Check the effective limit (for example with `ulimit -l`) before enabling locking.
+
+When `ndtbl_ENABLE_MMAP_DIAGNOSTICS=ON`, mmap-loaded field groups can report OS page residency for their payload:
 
 ```cpp
 const auto info = group.payload_residency();
 if (info.available) {
-  // inspect info.resident_pages, info.total_pages, info.resident_fraction
+  // mincore: info.resident_pages, info.total_pages, info.resident_fraction
+  // mapping: info.smaps_rss_bytes, info.smaps_locked_bytes, lock flags
+  // process: info.process_vmlck_bytes
 }
 ```
 
-The diagnostic is page-granular: it reports what `mincore` exposes for the
-mapped payload pages, not exact application RSS or exact bytes touched.
+The fields have three different scopes. The `resident_*` fields are the page-granular `mincore` view of the requested payload range. The `smaps_*` fields describe the complete Linux mapping containing the payload, including its RSS, `Locked` bytes, and the `VmFlags` lock flags (`lo` for locking and `lf` for lock-on-fault). The `process_vmlck_*` fields report process-wide `VmLck` from `/proc/self/status`. In lazy `MLOCK_ONFAULT` mode, `VmLck` can account for the complete lock-enabled range while the mapping's `Locked` bytes increase only as pages become resident. Availability flags accompany the [Linux `/proc`](https://docs.kernel.org/filesystems/proc.html) measurements so restricted or unavailable proc files are not reported as zero. Diagnostic mode may substantially increase runtime, depending on the application, and is therefore intended only for debugging.
 
 If you want to install the C++ headers and CMake package metadata:
 
@@ -112,6 +108,15 @@ cmake -B build -Dndtbl_ENABLE_MMAP=ON -Dndtbl_ENABLE_MMAP_POPULATE=ON
 cmake --build build
 ```
 
+To lock mmap-backed payload pages on first access on Linux:
+
+```bash
+cmake -B build -Dndtbl_ENABLE_MMAP=ON -Dndtbl_ENABLE_MMAP_LOCK=ON
+cmake --build build
+```
+
+Add `-Dndtbl_ENABLE_MMAP_POPULATE=ON` to populate and lock the complete payload while loading.
+
 To enable mmap payload residency diagnostics on Linux:
 
 ```bash
@@ -129,24 +134,14 @@ Inspect existing `.ndtbl` files:
 
 ## 📐 Interpolation
 
-The standard C++ lookup path uses multilinear interpolation through explicit
-`evaluate_all_linear()` and `Grid::prepare_linear()` calls. This path uses
-`2^Dim` table points per query and keeps the hot path allocation-free.
+The standard C++ lookup path uses multilinear interpolation through explicit `evaluate_all_linear()` and `Grid::prepare_linear()` calls. This path uses `2^Dim` table points per query and keeps the hot path allocation-free.
 
-The C++ API also exposes local tensor-product cubic interpolation through
-explicit `evaluate_all_cubic()` and `Grid::prepare_cubic()` calls. Cubic
-interpolation uses `4^Dim` table points, can be much more expensive in high
-dimensions, and may overshoot smooth-looking table data enough to produce
-unwanted values. Bounds handling is independent of interpolation order:
-queries outside the table domain can either clamp or throw according to the
+The C++ API also exposes local tensor-product cubic interpolation through explicit `evaluate_all_cubic()` and `Grid::prepare_cubic()` calls. Cubic interpolation uses `4^Dim` table points, can be much more expensive in high dimensions, and may overshoot smooth-looking table data enough to produce unwanted values. Bounds handling is independent of interpolation order: queries outside the table domain can either clamp or throw according to the
 selected `bounds_policy`.
 
 ## C++ Error Handling
 
-The C++ API distinguishes invalid table data, system I/O failures, and invalid
-object state through `ndtbl::FormatError`, `ndtbl::IOError`, and
-`ndtbl::StateError`. All three derive from `ndtbl::Error` and provide the
-standard `what()` message interface:
+The C++ API distinguishes invalid table data, system I/O failures, and invalid object state through `ndtbl::FormatError`, `ndtbl::IOError`, and `ndtbl::StateError`. All three derive from `ndtbl::Error` and provide the standard `what()` message interface:
 
 ```cpp
 try {
@@ -163,16 +158,13 @@ try {
 }
 ```
 
-Argument, bounds, and size failures continue to use the standard
-`std::invalid_argument`, `std::out_of_range`, and `std::overflow_error`
-categories.
+Argument, bounds, and size failures continue to use the standard `std::invalid_argument`, `std::out_of_range`, and `std::overflow_error` categories.
 
 ## 🐍 Python Package
 
-The repository also ships a separate Python package in [`python/ndtbl/`](https://github.com/thomasisensee/ndtbl/tree/main/python/ndtbl).
+The repository also ships a separate Python package in [`python/ndtbl/`](https://github.com/bwrse4hpc/ndtbl/tree/main/python/ndtbl).
 
-That package installs a different CLI executable named `ndtbl`, with the
-subcommands:
+That package installs a different CLI executable named `ndtbl`, with the subcommands:
 
 - `inspect`
 - `query`
@@ -191,7 +183,7 @@ After that, the Python CLI is available:
 ndtbl --help
 ```
 
-See [`python/ndtbl/README.md`](https://github.com/thomasisensee/ndtbl/tree/main/python/ndtbl) for usage examples and Python API details.
+See [`python/ndtbl/README.md`](https://github.com/bwrse4hpc/ndtbl/tree/main/python/ndtbl) for usage examples and Python API details.
 
 ## 🧪 Testing
 
@@ -211,10 +203,7 @@ ctest --output-on-failure
 
 ## ⏱️ Benchmarks
 
-The lookup-time benchmarks use [Google Benchmark](https://github.com/google/benchmark) and measure
-query preparation, prepared evaluation, typed combined lookup, and
-runtime-erased combined lookup for representative 2D, 4D, and 6D tables. See
-[`benchmarks/README.md`](https://github.com/thomasisensee/ndtbl/tree/main/benchmarks) for the benchmark case definitions and interpretation.
+The lookup-time benchmarks use [Google Benchmark](https://github.com/google/benchmark) and measure query preparation, prepared evaluation, typed combined lookup, and runtime-erased combined lookup for representative 2D, 4D, and 6D tables. See [`benchmarks/README.md`](https://github.com/bwrse4hpc/ndtbl/tree/main/benchmarks) for the benchmark case definitions and interpretation.
 
 Build the benchmark target:
 
@@ -234,8 +223,7 @@ Run a benchmark:
 Online documentation is available at
 [ndtbl.readthedocs.io](https://ndtbl.readthedocs.io/).
 
-To build the docs locally, first install the documentation requirements from
-the top-level `ndtbl/` directory:
+To build the docs locally, first install the documentation requirements from the top-level `ndtbl/` directory:
 
 ```bash
 python -m pip install -r doc/requirements.txt

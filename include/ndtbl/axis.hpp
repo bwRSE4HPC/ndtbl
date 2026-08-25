@@ -37,6 +37,7 @@ public:
    * @param min_value Smallest coordinate on the axis.
    * @param max_value Largest coordinate on the axis for multi-point axes.
    * @param size Number of support points on the axis.
+   *
    * @return Uniform axis descriptor.
    */
   static Axis uniform(double min_value, double max_value, std::size_t size)
@@ -66,6 +67,7 @@ public:
    * The coordinates must be strictly increasing.
    *
    * @param coordinates Explicit coordinate list in ascending order.
+   *
    * @return Axis descriptor using explicit coordinates.
    */
   static Axis from_coordinates(const std::vector<double>& coordinates)
@@ -126,6 +128,7 @@ public:
    * stored value.
    *
    * @param index Zero-based coordinate index.
+   *
    * @return Coordinate value at the requested index.
    */
   double coordinate(std::size_t index) const
@@ -176,6 +179,7 @@ public:
    *
    * @param value Coordinate value to bracket.
    * @param policy Bounds handling behavior for out-of-domain values.
+   *
    * @return Pair of lower interval index and upper interpolation weight.
    */
   std::pair<std::size_t, double> bracket(

@@ -130,6 +130,7 @@ write_group(const std::string& path,
  * the field payload.
  *
  * @param path Input file path.
+ *
  * @return Parsed metadata describing the stored group.
  * @see read_field_group
  * @see read_runtime_field_group
@@ -154,6 +155,7 @@ read_group_metadata(const std::string& path)
  * @tparam Dim Expected grid dimensionality of the file.
  * @tparam Stored Expected scalar payload type stored in the file.
  * @param path Input file path.
+ *
  * @return Typed field group with payload storage of type `Stored`.
  * @see read_group_metadata
  * @see FieldGroup
@@ -204,6 +206,7 @@ read_field_group(const std::string& path)
  * @tparam Dim Expected grid dimensionality of the file.
  * @tparam Output Output type used by runtime-erased interpolation.
  * @param path Input file path.
+ *
  * @return Runtime-erased field group with either float or double payload
  *         storage and `Output` interpolation results.
  * @see read_field_group

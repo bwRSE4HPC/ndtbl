@@ -151,6 +151,7 @@ public:
    * @brief Resolve a field name to its local field index.
    *
    * @param name Field name to look up.
+   *
    * @return Zero-based field index in storage order.
    */
   std::size_t field_index(const std::string& name) const
@@ -169,6 +170,7 @@ public:
    *
    * @tparam Stencil Fixed-size interpolation stencil type.
    * @param stencil Prepared stencil to reuse across fields.
+   *
    * @return Interpolated field values in storage order.
    * @see Grid::prepare_linear
    * @see Grid::prepare_cubic
@@ -187,6 +189,7 @@ public:
    * @tparam Output Floating-point type produced by interpolation.
    * @tparam Stencil Fixed-size interpolation stencil type.
    * @param stencil Prepared stencil to reuse across fields.
+   *
    * @return Interpolated field values in storage order.
    * @see evaluate_all(const Stencil&)
    */
@@ -249,8 +252,9 @@ public:
    * multilinear interpolation.
    *
    * @param coordinates Query coordinates in grid axis order.
-   * @return Interpolated field values in storage order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
+   *
+   * @return Interpolated field values in storage order.
    * @see evaluate_all(const Stencil&)
    */
   std::vector<Stored> evaluate_all_linear(
@@ -267,6 +271,7 @@ public:
    * @tparam Output Floating-point type produced by interpolation.
    * @param coordinates Query coordinates in grid axis order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
+   *
    * @return Interpolated field values in storage order.
    * @see evaluate_all_linear(const std::array<double, Dim>&, bounds_policy)
    */
@@ -326,6 +331,7 @@ public:
    *
    * @param coordinates Query coordinates in grid axis order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
+   *
    * @return Cubically interpolated field values in storage order.
    * @see Grid::prepare_cubic
    */
@@ -343,6 +349,7 @@ public:
    * @tparam Output Floating-point type produced by interpolation.
    * @param coordinates Query coordinates in grid axis order.
    * @param policy Bounds handling behavior for out-of-domain coordinates.
+   *
    * @return Cubically interpolated field values in storage order.
    * @see evaluate_all_cubic(const std::array<double, Dim>&, bounds_policy)
    */

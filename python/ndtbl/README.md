@@ -2,12 +2,11 @@
 
 [![License](https://img.shields.io/pypi/l/ndtbl?label=License)](https://opensource.org/licenses/MIT)
 [![codecov](https://codecov.io/gh/thomasisensee/ndtbl/graph/badge.svg?flag=python&token=5N4GQ0YP7I)](https://codecov.io/gh/thomasisensee/ndtbl)
-[![pre-commit.ci](https://results.pre-commit.ci/badge/github/thomasisensee/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/thomasisensee/ndtbl/main)
+[![pre-commit.ci](https://results.pre-commit.ci/badge/github/bwrse4hpc/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/bwrse4hpc/ndtbl/main)
 [![PyPI](https://img.shields.io/pypi/v/ndtbl?logo=pypi&logoColor=gold&label=PyPI)](https://pypi.org/project/ndtbl)
 [![Python](https://img.shields.io/pypi/pyversions/ndtbl?logo=python&logoColor=gold&label=Python)](https://pypi.org/project/ndtbl)
 
-Pure-Python tools for reading, writing, inspecting, and generating `.ndtbl`
-files without depending on the C++ binaries.
+Pure-Python tools for reading, writing, inspecting, and generating `.ndtbl` files without depending on the C++ binaries.
 
 The package is useful when you want to:
 
@@ -76,8 +75,7 @@ print(loaded.values[1, 0, :])
 `write_group` refuses to write files larger than 128 MiB by default. Pass
 `max_size_mib=...` when a larger output is intentional.
 
-The library uses standard Python logging and stays silent unless the calling
-application configures it. Enable ndtbl diagnostics with:
+The library uses standard Python logging and stays silent unless the calling application configures it. Enable ndtbl diagnostics with:
 
 ```python
 import logging
@@ -91,7 +89,7 @@ Diagnostics use the `ndtbl` logger hierarchy and never include payload values.
 The `values` array shape is `axis_0 x axis_1 x ... x field`.
 
 ### Demo notebook
-Use the [demo notebook](https://github.com/thomasisensee/ndtbl/blob/main/python/ndtbl/notebooks/demo.ipynb) to test the Python functionality of `ndtbl` and see how it can be used to read and write binary `.ndtbl` files.
+Use the [demo notebook](https://github.com/bwrse4hpc/ndtbl/blob/main/python/ndtbl/notebooks/demo.ipynb) to test the Python functionality of `ndtbl` and see how it can be used to read and write binary `.ndtbl` files.
 
 
 ## 💻 CLI
@@ -108,8 +106,7 @@ Show the top-level help:
 ndtbl --help
 ```
 
-Add `--verbose` (or `-v`) before the subcommand to write debug diagnostics to
-standard error while keeping command results on standard output:
+Add `--verbose` (or `-v`) before the subcommand to write debug diagnostics to standard error while keeping command results on standard output:
 
 ```bash
 ndtbl --verbose inspect example.ndtbl

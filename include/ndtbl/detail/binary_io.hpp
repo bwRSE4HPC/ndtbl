@@ -177,6 +177,7 @@ write_string(std::ostream& os, const std::string& value)
  * @brief Read a length-prefixed string from a binary stream.
  *
  * @param is Source stream in binary mode.
+ *
  * @return Decoded string value.
  */
 inline std::string
@@ -429,6 +430,7 @@ struct parsed_group_layout
  * @brief Read metadata from a stream without reading the payload body.
  *
  * @param is Source stream positioned at the file start.
+ *
  * @return Parsed metadata record plus payload location details.
  */
 inline parsed_group_layout
@@ -528,6 +530,7 @@ read_group_metadata_impl(std::istream& is)
  * @tparam Stored Scalar payload type to deserialize.
  * @param is Source stream positioned at the start of the payload.
  * @param value_count Number of scalar values to read.
+ *
  * @return Payload vector with `value_count` entries.
  */
 template<class Stored>
@@ -557,6 +560,7 @@ read_payload(std::istream& is, std::size_t value_count)
  *
  * @tparam Dim Expected number of axes.
  * @param axes Dynamic axis list to convert.
+ *
  * @return Fixed-size axis array with `Dim` entries.
  */
 template<std::size_t Dim>

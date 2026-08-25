@@ -39,6 +39,7 @@ public:
    *
    * @param data Pointer to the first payload byte.
    * @param size Number of logical `Stored` entries in the payload.
+   *
    * @throws std::invalid_argument If `data` is null and `size` is nonzero.
    */
   PayloadView(const std::uint8_t* data, std::size_t size)
@@ -53,6 +54,7 @@ public:
    *
    * @param data Pointer to the first typed payload value.
    * @param size Number of logical `Stored` entries in the payload.
+   *
    * @throws std::invalid_argument If `data` is null and `size` is nonzero.
    */
   PayloadView(const Stored* data, std::size_t size)
@@ -101,6 +103,7 @@ public:
    * not guaranteed to satisfy `alignof(Stored)`.
    *
    * @param index Zero-based payload index.
+   *
    * @return Deserialized payload value.
    */
   Stored at(std::size_t index) const
@@ -116,6 +119,7 @@ public:
    * @brief Read one payload value without bounds checking.
    *
    * @param index Zero-based payload index known to be valid.
+   *
    * @return Deserialized payload value.
    */
   Stored unchecked(std::size_t index) const
@@ -143,6 +147,7 @@ private:
  *
  * @tparam Stored Scalar payload type stored in the vector.
  * @param values Contiguous payload storage to view.
+ *
  * @return Read-only view into `values`.
  *
  * The vector must remain alive and must not reallocate while the returned view
