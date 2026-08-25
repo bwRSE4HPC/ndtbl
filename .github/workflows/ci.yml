@@ -34,6 +34,7 @@ jobs:
         filters: |
           cpp:
             - 'app/**'
+            - 'benchmarks/**'
             - 'cmake/**'
             - 'include/**'
             - 'src/**'
@@ -112,6 +113,27 @@ jobs:
     - name: Run tests
       shell: bash
       run: ctest --preset test
+
+  build-benchmarks:
+    name: Build benchmarks on ${{matrix.os}}
+    needs: changes
+    if: ${{ needs.changes.outputs.cpp == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Configure CMake
+      shell: bash
+      run: cmake --preset benchmark
+
+    - name: Build
+      shell: bash
+      run: cmake --build --preset benchmark
 
   coverage-test-cpp:
     name: Coverage Testing C++
