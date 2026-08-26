@@ -14,3 +14,10 @@ version: "0.3.0"
 date-released: "2026-08-26"
 license: MIT
 repository-code: https://github.com/bwrse4hpc/ndtbl
+identifiers:
+  - description: This is the collection of archived snapshots of all versions of ndtbl
+    type: doi
+    value: "10.5281/zenodo.22115156"
+  - description: This is the archived snapshot of version 0.3.0 of ndtbl
+    type: doi
+    value: "10.5281/zenodo.22115157"
