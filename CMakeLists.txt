@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.28)
 
 # Set a name and a version number for the project:
 project(ndtbl
-  VERSION 0.0.1
+  VERSION 0.3.0
   DESCRIPTION "Multidimensional table lookup and interpolation"
   HOMEPAGE_URL "https://github.com/bwrse4hpc/ndtbl"
   LANGUAGES CXX
