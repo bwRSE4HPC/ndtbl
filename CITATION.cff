@@ -10,7 +10,7 @@ authors:
 keywords:
   - "table lookup"
   - "multidimensional interpolation"
-version: "0.0.1"
-date-released: "2026-04-01"
+version: "0.3.0"
+date-released: "2026-08-26"
 license: MIT
 repository-code: https://github.com/bwrse4hpc/ndtbl
