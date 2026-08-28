@@ -8,6 +8,7 @@
 [![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=bwrse4hpc_ndtbl&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bwrse4hpc_ndtbl)
 [![C++](https://img.shields.io/badge/C%2B%2B-14-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B#Standardization)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22115156.svg)](https://doi.org/10.5281/zenodo.22115156)
+[![SWH](https://archive.softwareheritage.org/badge/origin/https://doi.org/10.5281/zenodo.22115156/)](https://archive.softwareheritage.org/browse/origin/?origin_url=https://doi.org/10.5281/zenodo.22115156)
 
 `ndtbl` is an n-dimensional table format and toolkit.
 
