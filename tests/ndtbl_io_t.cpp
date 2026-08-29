@@ -10,6 +10,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -246,6 +247,23 @@ TEST_CASE("payload residency reports availability for supported storage",
 
   std::remove(path.c_str());
 }
+
+#if NDTBL_ENABLE_MMAP
+
+TEST_CASE("mmap loader rejects payload ranges whose end would overflow",
+          "[io][mmap]")
+{
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl_test::write_file_bytes(path, { 'x' });
+
+  REQUIRE_THROWS_AS(ndtbl::detail::map_payload_bytes(
+                      path, 1, std::numeric_limits<std::size_t>::max()),
+                    ndtbl::FormatError);
+
+  std::remove(path.c_str());
+}
+
+#endif
 
 #if NDTBL_ENABLE_MMAP_DIAGNOSTICS
 
