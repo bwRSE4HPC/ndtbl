@@ -6,7 +6,7 @@ from ndtbl import ExplicitAxis, FieldGroup, GroupMetadata, UniformAxis
 
 
 def test_uniform_axis_normalizes_single_point_axis() -> None:
-    axis = UniformAxis(min=2.5, max=10.0, size=1)
+    axis = UniformAxis(min=2.5, max=float("inf"), size=1)
 
     assert axis.min == 2.5
     assert axis.max == 2.5
@@ -19,6 +19,10 @@ def test_uniform_axis_normalizes_single_point_axis() -> None:
         (0.0, 1.0, 0),
         (1.0, 1.0, 2),
         (2.0, 1.0, 2),
+        (float("nan"), 0.0, 1),
+        (0.0, float("inf"), 2),
+        (-float("inf"), 0.0, 2),
+        (-np.finfo(np.float64).max, np.finfo(np.float64).max, 2),
     ],
 )
 def test_uniform_axis_rejects_invalid_ranges(
@@ -46,6 +50,9 @@ def test_explicit_axis_accepts_strictly_increasing_coordinates() -> None:
         [[0.0, 1.0]],
         [0.0, 0.0, 1.0],
         [0.0, 1.0, 0.5],
+        [0.0, float("nan")],
+        [0.0, float("inf")],
+        [-np.finfo(np.float64).max, np.finfo(np.float64).max],
     ],
 )
 def test_explicit_axis_rejects_invalid_coordinates(

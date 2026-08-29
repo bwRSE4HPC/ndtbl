@@ -47,9 +47,17 @@ public:
         "uniform axis must contain at least one coordinate");
     }
 
+    if (!std::isfinite(min_value) || (size > 1 && !std::isfinite(max_value))) {
+      throw std::invalid_argument("uniform axis coordinates must be finite");
+    }
+
     if (size > 1 && !(max_value > min_value)) {
       throw std::invalid_argument(
         "uniform axis requires max > min when size > 1");
+    }
+
+    if (size > 1 && !std::isfinite(max_value - min_value)) {
+      throw std::invalid_argument("uniform axis span exceeds supported range");
     }
 
     Axis axis;
@@ -77,11 +85,22 @@ public:
         "explicit axis must contain at least one coordinate");
     }
 
+    for (const auto coordinate : coordinates) {
+      if (!std::isfinite(coordinate)) {
+        throw std::invalid_argument("explicit axis coordinates must be finite");
+      }
+    }
+
     for (std::size_t i = 1; i < coordinates.size(); ++i) {
       if (!(coordinates[i] > coordinates[i - 1])) {
         throw std::invalid_argument(
           "explicit axis coordinates must be strictly increasing");
       }
+    }
+
+    if (coordinates.size() > 1 &&
+        !std::isfinite(coordinates.back() - coordinates.front())) {
+      throw std::invalid_argument("explicit axis span exceeds supported range");
     }
 
     Axis axis;

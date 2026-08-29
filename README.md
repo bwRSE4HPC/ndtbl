@@ -228,14 +228,15 @@ Online documentation is available at
 To build the docs locally, first install the documentation requirements from the top-level `ndtbl/` directory:
 
 ```bash
-python -m pip install -r doc/requirements.txt
+python -m pip install -r doc/requirements-rtd.txt
 ```
 
-Then build the Sphinx target:
+Then build the Sphinx target using the CMake preset:
 
 ```bash
-cmake -B build -Dndtbl_BUILD_DOCS=ON -Dndtbl_BUILD_TESTING=OFF
-cmake --build build --target sphinx-doc
+cmake --preset documentation
+cmake --build --preset documentation
 ```
 
-Open `build/doc/sphinx/index.html` in a browser to inspect the generated site.
+Open `build/documentation/doc/sphinx/index.html` in a browser to inspect the
+generated site.

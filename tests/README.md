@@ -27,6 +27,9 @@ The test build first tries to find an installed or parent-provided Catch2 packag
 - `ndtbl_interpolation_t.cpp` checks linear and experimental cubic interpolation behavior for typed `FieldGroup` objects and runtime-erased `RuntimeFieldGroup` objects.
 - `ndtbl_io_t.cpp` checks binary read/write behavior, metadata handling, and rejection of malformed files.
 - `test_support.hpp` provides shared helpers for temporary files, byte-level layout checks, and synthetic linear payload generation.
+- `install-consumer/` is a standalone project that consumes an installed ndtbl package through `find_package(ndtbl CONFIG REQUIRED)`.
+- `add-subdirectory-consumer/` is a standalone project that consumes an ndtbl source tree through `add_subdirectory`.
+- `consumer/main.cpp` is the shared compile-only smoke-test source used by both consumer projects.
 
 ## What Is Covered
 

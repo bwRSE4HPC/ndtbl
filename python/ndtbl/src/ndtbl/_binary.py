@@ -30,6 +30,12 @@ UINT16 = struct.Struct(f"{LITTLE_ENDIAN_PREFIX}H")
 UINT64 = struct.Struct(f"{LITTLE_ENDIAN_PREFIX}Q")
 DOUBLE = struct.Struct(f"{LITTLE_ENDIAN_PREFIX}d")
 
+FIXED_HEADER_SIZE = (
+    len(MAGIC) + UINT8.size + UINT8.size + UINT16.size + UINT64.size * 4
+)
+AXIS_HEADER_SIZE = UINT8.size + UINT8.size + UINT16.size + UINT64.size
+MINIMUM_AXIS_SIZE = AXIS_HEADER_SIZE + DOUBLE.size
+
 DTYPE_TO_TAG: dict[FloatDType, int] = {
     np.dtype(np.float32): SCALAR_FLOAT32,
     np.dtype(np.float64): SCALAR_FLOAT64,
@@ -46,6 +52,49 @@ class ParsedLayout:
 
     metadata: GroupMetadata
     payload_offset: int
+    value_count: int
+    payload_size: int
+
+
+class _BoundedMetadataReader:
+    """Read values without crossing the declared metadata boundary."""
+
+    def __init__(self, stream: BinaryIO, remaining: int) -> None:
+        self._stream = stream
+        self.remaining = remaining
+
+    def require_bytes(self, size: int, what: str) -> None:
+        """Require ``size`` bytes to remain in the metadata region."""
+        if size > self.remaining:
+            raise NdtblFormatError(f"ndtbl {what} exceeds metadata boundary")
+
+    def require_count(self, count: int, encoded_size: int, what: str) -> None:
+        """Require space for ``count`` minimally encoded values."""
+        if count > self.remaining // encoded_size:
+            raise NdtblFormatError(f"ndtbl {what} exceeds metadata boundary")
+
+    def read_exact(self, size: int, what: str) -> bytes:
+        """Read bytes after checking the metadata boundary."""
+        self.require_bytes(size, what)
+        data = _read_exact(self._stream, size)
+        self.remaining -= size
+        return data
+
+    def read_uint8(self, what: str) -> int:
+        """Read one unsigned 8-bit integer."""
+        return int(UINT8.unpack(self.read_exact(UINT8.size, what))[0])
+
+    def read_uint16(self, what: str) -> int:
+        """Read one unsigned 16-bit integer."""
+        return int(UINT16.unpack(self.read_exact(UINT16.size, what))[0])
+
+    def read_uint64(self, what: str) -> int:
+        """Read one unsigned 64-bit integer."""
+        return int(UINT64.unpack(self.read_exact(UINT64.size, what))[0])
+
+    def read_double(self, what: str) -> float:
+        """Read one IEEE-754 double-precision value."""
+        return float(DOUBLE.unpack(self.read_exact(DOUBLE.size, what))[0])
 
 
 def _read_exact(stream: BinaryIO, size: int) -> bytes:
@@ -69,11 +118,6 @@ def _read_uint16(stream: BinaryIO) -> int:
 def _read_uint64(stream: BinaryIO) -> int:
     """Read one unsigned 64-bit integer from a stream."""
     return int(UINT64.unpack(_read_exact(stream, UINT64.size))[0])
-
-
-def _read_double(stream: BinaryIO) -> float:
-    """Read one IEEE-754 double-precision value from a stream."""
-    return float(DOUBLE.unpack(_read_exact(stream, DOUBLE.size))[0])
 
 
 def _write_uint8(stream: BinaryIO, value: int) -> None:
@@ -102,10 +146,11 @@ def _require_zero(value: int, what: str) -> None:
         raise NdtblFormatError(f"ndtbl {what} must be zero")
 
 
-def _read_string(stream: BinaryIO) -> str:
+def _read_string(reader: _BoundedMetadataReader) -> str:
     """Read a length-prefixed UTF-8 string from a stream."""
-    size = _read_uint64(stream)
-    data = _read_exact(stream, size)
+    size = reader.read_uint64("field name length")
+    reader.require_bytes(size, "field name")
+    data = reader.read_exact(size, "field name")
     return data.decode("utf-8")
 
 
@@ -116,23 +161,34 @@ def _write_string(stream: BinaryIO, value: str) -> None:
     stream.write(encoded)
 
 
-def _read_axis(stream: BinaryIO) -> UniformAxis | ExplicitAxis:
+def _read_axis(reader: _BoundedMetadataReader) -> UniformAxis | ExplicitAxis:
     """Read one serialized axis definition from a stream."""
-    axis_tag = _read_uint8(stream)
-    _require_zero(_read_uint8(stream), "axis reserved byte")
-    _require_zero(_read_uint16(stream), "axis reserved field")
-    size = _read_uint64(stream)
+    axis_tag = reader.read_uint8("axis kind")
+    _require_zero(
+        reader.read_uint8("axis reserved byte"), "axis reserved byte"
+    )
+    _require_zero(
+        reader.read_uint16("axis reserved field"), "axis reserved field"
+    )
+    size = reader.read_uint64("axis extent")
 
-    if axis_tag == AXIS_KIND_UNIFORM:
-        return UniformAxis(
-            min=_read_double(stream),
-            max=_read_double(stream),
-            size=size,
-        )
+    try:
+        if axis_tag == AXIS_KIND_UNIFORM:
+            reader.require_bytes(DOUBLE.size * 2, "uniform axis coordinates")
+            return UniformAxis(
+                min=reader.read_double("axis minimum"),
+                max=reader.read_double("axis maximum"),
+                size=size,
+            )
 
-    if axis_tag == AXIS_KIND_EXPLICIT:
-        coordinates = [_read_double(stream) for _ in range(size)]
-        return ExplicitAxis(coordinates)
+        if axis_tag == AXIS_KIND_EXPLICIT:
+            reader.require_count(size, DOUBLE.size, "axis coordinates")
+            coordinates = [
+                reader.read_double("axis coordinate") for _ in range(size)
+            ]
+            return ExplicitAxis(coordinates)
+    except ValueError as error:
+        raise NdtblFormatError(str(error)) from error
 
     raise NdtblFormatError(f"unsupported ndtbl axis kind: {axis_tag}")
 
@@ -184,11 +240,27 @@ def serialized_group_size(group: FieldGroup) -> int:
     return _metadata_size(metadata) + payload_size
 
 
+def _stream_size(stream: BinaryIO) -> int:
+    """Return the stream size while preserving its current position."""
+    position = stream.tell()
+    try:
+        stream.seek(0, 2)
+        size = stream.tell()
+    finally:
+        stream.seek(position)
+    if size < 0:
+        raise OSError("failed to determine ndtbl input size")
+    return size
+
+
 def _read_layout_from_stream(stream: BinaryIO) -> ParsedLayout:
     """Read ndtbl metadata and validate the encoded payload offset."""
+    file_size = _stream_size(stream)
     magic = _read_exact(stream, len(MAGIC))
     if magic != MAGIC:
         raise NdtblFormatError("invalid ndtbl magic header")
+    if file_size < FIXED_HEADER_SIZE:
+        raise NdtblFormatError("unexpected end of ndtbl file")
 
     version = _read_uint8(stream)
     if version != VERSION:
@@ -209,23 +281,44 @@ def _read_layout_from_stream(stream: BinaryIO) -> ParsedLayout:
     field_count = _read_uint64(stream)
     point_count = _read_uint64(stream)
 
-    axes = tuple(_read_axis(stream) for _ in range(dimension))
-    field_names = tuple(_read_string(stream) for _ in range(field_count))
+    value_count = point_count * field_count
+    payload_size = value_count * dtype.itemsize
+    if payload_offset < FIXED_HEADER_SIZE:
+        raise NdtblFormatError("ndtbl payload offset does not match metadata")
+    if payload_offset > file_size:
+        raise NdtblFormatError("ndtbl payload offset exceeds file size")
 
-    metadata = GroupMetadata(
-        axes=axes,
-        field_names=field_names,
-        dtype=dtype,
-        format_version=version,
-    )
-    if metadata.point_count != point_count:
-        raise NdtblFormatError("ndtbl point count does not match axis extents")
+    reader = _BoundedMetadataReader(stream, payload_offset - FIXED_HEADER_SIZE)
+    reader.require_count(dimension, MINIMUM_AXIS_SIZE, "dimension")
+    axes = tuple(_read_axis(reader) for _ in range(dimension))
 
-    actual_offset = stream.tell()
-    if actual_offset != payload_offset:
+    reader.require_count(field_count, UINT64.size, "field count")
+    field_names = tuple(_read_string(reader) for _ in range(field_count))
+    if reader.remaining != 0:
         raise NdtblFormatError("ndtbl payload offset does not match metadata")
 
-    return ParsedLayout(metadata=metadata, payload_offset=payload_offset)
+    try:
+        metadata = GroupMetadata(
+            axes=axes,
+            field_names=field_names,
+            dtype=dtype,
+            format_version=version,
+        )
+    except (TypeError, ValueError) as error:
+        raise NdtblFormatError(str(error)) from error
+    if metadata.point_count != point_count:
+        raise NdtblFormatError("ndtbl point count does not match axis extents")
+    if payload_offset + payload_size != file_size:
+        raise NdtblFormatError(
+            "ndtbl file size does not match declared payload"
+        )
+
+    return ParsedLayout(
+        metadata=metadata,
+        payload_offset=payload_offset,
+        value_count=value_count,
+        payload_size=payload_size,
+    )
 
 
 def read_metadata_from_stream(stream: BinaryIO) -> GroupMetadata:
@@ -237,9 +330,7 @@ def read_group_from_stream(stream: BinaryIO) -> FieldGroup:
     """Read an entire ndtbl file from an already opened stream."""
     layout = _read_layout_from_stream(stream)
     metadata = layout.metadata
-    value_count = metadata.point_count * metadata.field_count
-    payload_size = value_count * metadata.dtype.itemsize
-    payload = _read_exact(stream, payload_size)
+    payload = _read_exact(stream, layout.payload_size)
 
     wire_dtype = metadata.dtype.newbyteorder("<")
     values = np.frombuffer(payload, dtype=wire_dtype).astype(

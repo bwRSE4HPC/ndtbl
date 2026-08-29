@@ -5,6 +5,7 @@
 [![pre-commit.ci](https://results.pre-commit.ci/badge/github/bwRSE4HPC/ndtbl/main.svg)](https://results.pre-commit.ci/latest/github/bwRSE4HPC/ndtbl/main)
 [![PyPI](https://img.shields.io/pypi/v/ndtbl?logo=pypi&logoColor=gold&label=PyPI)](https://pypi.org/project/ndtbl)
 [![Python](https://img.shields.io/pypi/pyversions/ndtbl?logo=python&logoColor=gold&label=Python)](https://pypi.org/project/ndtbl)
+[![Typing](https://img.shields.io/pypi/types/ndtbl)](https://pypi.org/project/ndtbl/)
 
 Pure-Python tools for reading, writing, inspecting, and generating `.ndtbl` files without depending on the C++ binaries.
 

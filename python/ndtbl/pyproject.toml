@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "hatchling>=1.25",
+    "hatchling>=1.27",
 ]
 build-backend = "hatchling.build"
 
@@ -14,6 +14,10 @@ authors = [
 version = "0.3.0"
 requires-python = ">=3.11"
 license = "MIT"
+license-files = [
+    "LICENSE.md",
+    "COPYING.md",
+]
 keywords = [
   "ndtbl",
   "binary-format",
@@ -87,7 +91,7 @@ target-version = "py311"
 select = [
     "B",   # flake8-bugbear
     "D",   # pydocstyle
-    "E",   #pycodestyle error rules
+    "E",   # pycodestyle error rules
     "F",   # Pyflakes
     "I",   # isort
     "SIM", # flake8-simplify

@@ -174,6 +174,23 @@ def test_read_metadata_rejects_unsupported_scalar_tag(
         read_metadata(path)
 
 
+def test_read_metadata_rejects_non_finite_axis_coordinates(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "non-finite-axis.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    data = bytearray(path.read_bytes())
+    struct.pack_into("<d", data, 64, float("inf"))
+    path.write_bytes(data)
+
+    with pytest.raises(
+        NdtblFormatError, match="uniform axis coordinates must be finite"
+    ):
+        read_metadata(path)
+
+
 def test_read_metadata_rejects_point_count_mismatch(
     tmp_path,
     sample_uniform_group: FieldGroup,
@@ -313,3 +330,74 @@ def test_read_metadata_rejects_payload_offset_mismatch(
         NdtblFormatError, match="ndtbl payload offset does not match metadata"
     ):
         read_metadata(path)
+
+
+@pytest.mark.parametrize(
+    "case",
+    (
+        "dimension",
+        "explicit extent",
+        "field count",
+        "field name length",
+        "payload arithmetic",
+        "payload offset",
+    ),
+)
+def test_read_metadata_bounds_attacker_controlled_sizes(
+    tmp_path,
+    case: str,
+) -> None:
+    path = tmp_path / "untrusted-size.ndtbl"
+    group = FieldGroup(
+        axes=(UniformAxis(2.0, 2.0, 1),),
+        field_names=("A",),
+        values=np.array([[1.5]], dtype=np.float64),
+    )
+    write_group(path, group)
+
+    data = bytearray(path.read_bytes())
+    assert len(data) == 89
+    maximum_uint64 = (1 << 64) - 1
+
+    if case == "dimension":
+        struct.pack_into("<Q", data, 20, maximum_uint64)
+    elif case == "explicit extent":
+        data[44] = 2
+        struct.pack_into("<Q", data, 48, maximum_uint64)
+    elif case == "field count":
+        struct.pack_into("<Q", data, 28, maximum_uint64)
+        struct.pack_into("<Q", data, 36, 0)
+        del data[81:]
+    elif case == "field name length":
+        struct.pack_into("<Q", data, 72, maximum_uint64)
+    elif case == "payload arithmetic":
+        struct.pack_into("<Q", data, 28, maximum_uint64)
+        struct.pack_into("<Q", data, 36, maximum_uint64)
+    else:
+        struct.pack_into("<Q", data, 12, maximum_uint64)
+
+    path.write_bytes(data)
+    with pytest.raises(NdtblFormatError):
+        read_metadata(path)
+
+
+@pytest.mark.parametrize("change", ("truncate", "append"))
+def test_readers_require_payload_to_end_at_eof(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+    change: str,
+) -> None:
+    path = tmp_path / "wrong-file-size.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    data = bytearray(path.read_bytes())
+    if change == "truncate":
+        data.pop()
+    else:
+        data.append(0)
+    path.write_bytes(data)
+
+    with pytest.raises(NdtblFormatError):
+        read_metadata(path)
+    with pytest.raises(NdtblFormatError):
+        read_group(path)

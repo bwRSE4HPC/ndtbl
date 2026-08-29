@@ -521,10 +521,15 @@ map_payload_bytes(const std::string& path,
       system_error_message("failed to stat ndtbl input file for mmap"));
   }
 
+  if (status.st_size < 0) {
+    close(fd);
+    throw IOError("ndtbl input file reports a negative size");
+  }
+
   const auto file_size = static_cast<std::uintmax_t>(status.st_size);
-  const auto payload_end =
-    static_cast<std::uintmax_t>(payload_offset) + payload_size;
-  if (payload_end > file_size) {
+  const auto offset = static_cast<std::uintmax_t>(payload_offset);
+  const auto size = static_cast<std::uintmax_t>(payload_size);
+  if (offset > file_size || size > file_size - offset) {
     close(fd);
     throw FormatError("ndtbl file payload exceeds file size");
   }
@@ -539,6 +544,10 @@ map_payload_bytes(const std::string& path,
   const std::size_t aligned_offset =
     payload_offset - (payload_offset % alignment);
   const std::size_t delta = payload_offset - aligned_offset;
+  if (payload_size > std::numeric_limits<std::size_t>::max() - delta) {
+    close(fd);
+    throw FormatError("ndtbl payload mapping range exceeds supported size");
+  }
   const std::size_t mapping_length = delta + payload_size;
 
   int mapping_flags = MAP_PRIVATE;

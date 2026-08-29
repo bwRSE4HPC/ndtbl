@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace ndtbl {
@@ -160,6 +161,140 @@ using payload_uint_t =
                      std::uint64_t>;
 
 /**
+ * @brief Restrict metadata reads to the declared metadata byte range.
+ */
+class bounded_metadata_reader
+{
+public:
+  /**
+   * @brief Construct a reader with a fixed metadata byte budget.
+   *
+   * @param is Source stream positioned at the metadata region.
+   * @param remaining Number of metadata bytes available to read.
+   */
+  bounded_metadata_reader(std::istream& is, std::size_t remaining)
+    : is_(is)
+    , remaining_(remaining)
+  {
+  }
+
+  /**
+   * @brief Require a byte sequence to fit within the metadata region.
+   *
+   * @param size Number of bytes required.
+   * @param what Description used in the format-error message.
+   *
+   * @throws FormatError If fewer than @p size metadata bytes remain.
+   */
+  void require_bytes(std::size_t size, const std::string& what) const
+  {
+    if (size > remaining_) {
+      throw FormatError("ndtbl " + what + " exceeds metadata boundary");
+    }
+  }
+
+  /**
+   * @brief Require a count of fixed-size records to fit in the metadata.
+   *
+   * @param count Number of records declared by the input.
+   * @param encoded_size Minimum encoded byte size of one record.
+   * @param what Description used in the format-error message.
+   *
+   * @throws FormatError If the records exceed the remaining metadata.
+   */
+  void require_count(std::size_t count,
+                     std::size_t encoded_size,
+                     const std::string& what) const
+  {
+    if (encoded_size != 0 && count > remaining_ / encoded_size) {
+      throw FormatError("ndtbl " + what + " exceeds metadata boundary");
+    }
+  }
+
+  /**
+   * @brief Read bytes and consume them from the metadata budget.
+   *
+   * @param data Destination byte buffer.
+   * @param size Number of bytes to read.
+   * @param what Description used in the format-error message.
+   *
+   * @throws FormatError If the read crosses the metadata boundary.
+   * @throws IOError If the underlying stream read fails.
+   */
+  void read(char* data, std::size_t size, const std::string& what)
+  {
+    require_bytes(size, what);
+    read_bytes(is_, data, size);
+    remaining_ -= size;
+  }
+
+  /**
+   * @brief Read one little-endian unsigned integer from the metadata.
+   *
+   * @tparam UInt Unsigned integer type to decode.
+   * @param what Description used in the format-error message.
+   *
+   * @return Decoded integer value.
+   * @throws FormatError If the read crosses the metadata boundary.
+   * @throws IOError If the underlying stream read fails.
+   */
+  template<class UInt>
+  UInt read_uint_le(const std::string& what)
+  {
+    static_assert(std::is_unsigned<UInt>::value,
+                  "read_uint_le requires an unsigned integer type");
+
+    std::array<char, sizeof(UInt)> bytes = {};
+    read(bytes.data(), bytes.size(), what);
+
+    UInt value = 0;
+    for (std::size_t index = 0; index < bytes.size(); ++index) {
+      value |= static_cast<UInt>(static_cast<unsigned char>(bytes[index]))
+               << (index * 8u);
+    }
+    return value;
+  }
+
+  /**
+   * @brief Read one little-endian IEEE-754 value from the metadata.
+   *
+   * @tparam Float Floating-point type to decode.
+   * @tparam UInt Unsigned integer type with the same width as @c Float.
+   * @param what Description used in the format-error message.
+   *
+   * @return Decoded floating-point value.
+   * @throws FormatError If the read crosses the metadata boundary.
+   * @throws IOError If the underlying stream read fails.
+   */
+  template<class Float, class UInt>
+  Float read_float_le(const std::string& what)
+  {
+    static_assert(std::is_floating_point<Float>::value,
+                  "read_float_le requires a floating-point type");
+    static_assert(sizeof(Float) == sizeof(UInt),
+                  "read_float_le requires matching bit width");
+    static_assert(std::numeric_limits<Float>::is_iec559,
+                  "ndtbl requires IEEE-754 floating-point types");
+
+    const auto bits = read_uint_le<UInt>(what);
+    Float value;
+    std::memcpy(&value, &bits, sizeof(value));
+    return value;
+  }
+
+  /**
+   * @brief Return the unread metadata byte count.
+   *
+   * @return Number of bytes remaining before the payload boundary.
+   */
+  std::size_t remaining() const { return remaining_; }
+
+private:
+  std::istream& is_;
+  std::size_t remaining_;
+};
+
+/**
  * @brief Write a length-prefixed UTF-8 string to a binary stream.
  *
  * @param os Destination stream in binary mode.
@@ -181,19 +316,26 @@ write_string(std::ostream& os, const std::string& value)
  * @return Decoded string value.
  */
 inline std::string
-read_string(std::istream& is)
+read_string(bounded_metadata_reader& reader)
 {
-  const auto size = read_uint_le<std::uint64_t>(is);
-  if (size == 0) {
-    return std::string();
-  }
-  if (size >
+  const auto encoded_size =
+    reader.read_uint_le<std::uint64_t>("field name length");
+  if (encoded_size >
       static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max())) {
     throw FormatError("ndtbl string length exceeds supported size");
   }
+  const auto size = static_cast<std::size_t>(encoded_size);
+  reader.require_bytes(size, "field name");
+  if (size == 0) {
+    return std::string();
+  }
 
-  std::string value(static_cast<std::size_t>(size), '\0');
-  read_bytes(is, &value[0], static_cast<std::size_t>(size));
+  std::string value;
+  if (size > value.max_size()) {
+    throw FormatError("ndtbl string length exceeds supported size");
+  }
+  value.resize(size);
+  reader.read(&value[0], size, "field name");
   return value;
 }
 
@@ -216,6 +358,63 @@ fixed_header_size()
          sizeof(std::uint64_t) + // Dimension
          sizeof(std::uint64_t) + // Field count
          sizeof(std::uint64_t);  // Point count
+}
+
+inline std::size_t
+input_size(std::istream& is)
+{
+  std::istream::pos_type original_position = std::istream::pos_type(-1);
+  std::istream::pos_type end_position = std::istream::pos_type(-1);
+  try {
+    original_position = is.tellg();
+    is.seekg(0, std::ios::end);
+    end_position = is.tellg();
+    is.seekg(original_position);
+  } catch (const std::ios_base::failure&) {
+    throw IOError("failed to determine ndtbl input size");
+  }
+
+  if (original_position < 0 || end_position < 0 || !is.good()) {
+    throw IOError("failed to determine ndtbl input size");
+  }
+
+  const auto end_offset = static_cast<std::streamoff>(end_position);
+  if (end_offset < 0 ||
+      static_cast<std::uintmax_t>(end_offset) >
+        static_cast<std::uintmax_t>(std::numeric_limits<std::size_t>::max())) {
+    throw FormatError("ndtbl input size exceeds supported size");
+  }
+  return static_cast<std::size_t>(end_offset);
+}
+
+inline std::size_t
+narrow_format_size(std::uint64_t value, const std::string& what)
+{
+  if (value >
+      static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max())) {
+    throw FormatError("ndtbl " + what + " exceeds supported size");
+  }
+  return static_cast<std::size_t>(value);
+}
+
+inline std::size_t
+checked_format_multiply(std::size_t lhs,
+                        std::size_t rhs,
+                        const std::string& what)
+{
+  if (lhs != 0 && rhs > std::numeric_limits<std::size_t>::max() / lhs) {
+    throw FormatError("ndtbl " + what + " exceeds supported size");
+  }
+  return lhs * rhs;
+}
+
+inline std::size_t
+checked_format_add(std::size_t lhs, std::size_t rhs, const std::string& what)
+{
+  if (rhs > std::numeric_limits<std::size_t>::max() - lhs) {
+    throw FormatError("ndtbl " + what + " exceeds supported size");
+  }
+  return lhs + rhs;
 }
 
 inline std::size_t
@@ -436,7 +635,11 @@ struct parsed_group_layout
 inline parsed_group_layout
 read_group_layout_impl(std::istream& is)
 {
+  const std::size_t file_size = input_size(is);
   verify_magic(is);
+  if (file_size < fixed_header_size()) {
+    throw FormatError("unexpected end of ndtbl input");
+  }
 
   const auto version = read_uint_le<std::uint8_t>(is);
   if (version != current_format_version) {
@@ -449,32 +652,68 @@ read_group_layout_impl(std::istream& is)
     static_cast<scalar_type>(read_uint_le<std::uint8_t>(is));
   require_zero(read_uint_le<std::uint16_t>(is), "header reserved field");
   const std::size_t payload_offset =
-    narrow_u64_to_size(read_uint_le<std::uint64_t>(is), "payload offset");
+    narrow_format_size(read_uint_le<std::uint64_t>(is), "payload offset");
 
   metadata.dimension =
-    narrow_u64_to_size(read_uint_le<std::uint64_t>(is), "dimension");
+    narrow_format_size(read_uint_le<std::uint64_t>(is), "dimension");
   metadata.field_count =
-    narrow_u64_to_size(read_uint_le<std::uint64_t>(is), "field count");
+    narrow_format_size(read_uint_le<std::uint64_t>(is), "field count");
   metadata.point_count =
-    narrow_u64_to_size(read_uint_le<std::uint64_t>(is), "point count");
+    narrow_format_size(read_uint_le<std::uint64_t>(is), "point count");
 
+  const std::size_t value_count = checked_format_multiply(
+    metadata.point_count, metadata.field_count, "payload value count");
+  const std::size_t payload_size = checked_format_multiply(
+    value_count, scalar_size(metadata.value_type), "payload byte size");
+
+  if (payload_offset < fixed_header_size()) {
+    throw FormatError("ndtbl payload offset does not match metadata");
+  }
+  if (payload_offset > file_size) {
+    throw FormatError("ndtbl payload offset exceeds file size");
+  }
+
+  bounded_metadata_reader reader(is, payload_offset - fixed_header_size());
+  constexpr std::size_t axis_header_size =
+    sizeof(std::uint8_t) + sizeof(std::uint8_t) + sizeof(std::uint16_t) +
+    sizeof(std::uint64_t);
+  constexpr std::size_t minimum_axis_size = axis_header_size + sizeof(double);
+
+  reader.require_count(metadata.dimension, minimum_axis_size, "dimension");
+  if (metadata.dimension > metadata.axes.max_size()) {
+    throw FormatError("ndtbl dimension exceeds supported size");
+  }
   metadata.axes.reserve(metadata.dimension);
   for (std::size_t axis = 0; axis < metadata.dimension; ++axis) {
-    const auto kind = static_cast<axis_kind>(read_uint_le<std::uint8_t>(is));
-    require_zero(read_uint_le<std::uint8_t>(is), "axis reserved byte");
-    require_zero(read_uint_le<std::uint16_t>(is), "axis reserved field");
-    const std::size_t extent =
-      narrow_u64_to_size(read_uint_le<std::uint64_t>(is), "axis extent");
+    const auto kind =
+      static_cast<axis_kind>(reader.read_uint_le<std::uint8_t>("axis kind"));
+    require_zero(reader.read_uint_le<std::uint8_t>("axis reserved byte"),
+                 "axis reserved byte");
+    require_zero(reader.read_uint_le<std::uint16_t>("axis reserved field"),
+                 "axis reserved field");
+    const std::size_t extent = narrow_format_size(
+      reader.read_uint_le<std::uint64_t>("axis extent"), "axis extent");
 
     try {
       if (kind == axis_kind::uniform) {
-        const auto min_value = read_float_le<double, std::uint64_t>(is);
-        const auto max_value = read_float_le<double, std::uint64_t>(is);
+        reader.require_bytes(sizeof(double) * 2, "uniform axis coordinates");
+        const auto min_value =
+          reader.read_float_le<double, std::uint64_t>("axis minimum");
+        const auto max_value =
+          reader.read_float_le<double, std::uint64_t>("axis maximum");
         metadata.axes.push_back(Axis::uniform(min_value, max_value, extent));
       } else if (kind == axis_kind::explicit_coordinates) {
-        std::vector<double> coordinates(extent);
+        const std::size_t coordinate_bytes = checked_format_multiply(
+          extent, sizeof(double), "axis coordinate bytes");
+        reader.require_bytes(coordinate_bytes, "axis coordinates");
+        std::vector<double> coordinates;
+        if (extent > coordinates.max_size()) {
+          throw FormatError("ndtbl axis extent exceeds supported size");
+        }
+        coordinates.resize(extent);
         for (std::size_t i = 0; i < extent; ++i) {
-          coordinates[i] = read_float_le<double, std::uint64_t>(is);
+          coordinates[i] =
+            reader.read_float_le<double, std::uint64_t>("axis coordinate");
         }
         metadata.axes.push_back(Axis::from_coordinates(coordinates));
       } else {
@@ -485,36 +724,41 @@ read_group_layout_impl(std::istream& is)
     }
   }
 
+  reader.require_count(
+    metadata.field_count, sizeof(std::uint64_t), "field count");
+  if (metadata.field_count > metadata.field_names.max_size()) {
+    throw FormatError("ndtbl field count exceeds supported size");
+  }
   metadata.field_names.reserve(metadata.field_count);
   for (std::size_t field = 0; field < metadata.field_count; ++field) {
-    metadata.field_names.push_back(read_string(is));
+    metadata.field_names.push_back(read_string(reader));
   }
 
-  if (axis_point_count(metadata.axes) != metadata.point_count) {
-    throw FormatError("ndtbl point count does not match axis extents");
-  }
-
-  auto payload_position = std::istream::pos_type(-1);
-  try {
-    payload_position = is.tellg();
-  } catch (const std::ios_base::failure&) {
-    throw IOError("failed to determine ndtbl payload offset");
-  }
-  if (payload_position < 0) {
-    throw IOError("failed to determine ndtbl payload offset");
-  }
-  const auto actual_payload_offset = static_cast<std::size_t>(payload_position);
-  if (actual_payload_offset != payload_offset) {
+  if (reader.remaining() != 0) {
     throw FormatError("ndtbl payload offset does not match metadata");
   }
 
+  std::size_t parsed_point_count = 0;
+  try {
+    parsed_point_count = axis_point_count(metadata.axes);
+  } catch (const std::overflow_error& error) {
+    throw FormatError(error.what());
+  }
+  if (parsed_point_count != metadata.point_count) {
+    throw FormatError("ndtbl point count does not match axis extents");
+  }
+
+  const std::size_t expected_file_size =
+    checked_format_add(payload_offset, payload_size, "file size");
+  if (expected_file_size != file_size) {
+    throw FormatError("ndtbl file size does not match declared payload");
+  }
+
   parsed_group_layout layout;
-  layout.metadata = metadata;
-  layout.payload_offset = actual_payload_offset;
-  layout.value_count = checked_multiply_size(
-    metadata.point_count, metadata.field_count, "payload value count");
-  layout.payload_size = checked_multiply_size(
-    layout.value_count, scalar_size(metadata.value_type), "payload byte size");
+  layout.metadata = std::move(metadata);
+  layout.payload_offset = payload_offset;
+  layout.value_count = value_count;
+  layout.payload_size = payload_size;
   return layout;
 }
 
@@ -537,15 +781,19 @@ template<class Stored>
 std::vector<Stored>
 read_payload(std::istream& is, std::size_t value_count)
 {
-  std::vector<Stored> values(value_count);
+  const std::size_t payload_size =
+    checked_format_multiply(value_count, sizeof(Stored), "payload byte size");
+  std::vector<Stored> values;
+  if (value_count > values.max_size()) {
+    throw FormatError("ndtbl payload value count exceeds supported size");
+  }
+  values.resize(value_count);
   if (value_count == 0) {
     return values;
   }
 
   if (host_is_little_endian()) {
-    read_bytes(is,
-               reinterpret_cast<char*>(values.data()),
-               values.size() * sizeof(Stored));
+    read_bytes(is, reinterpret_cast<char*>(values.data()), payload_size);
     return values;
   }
 

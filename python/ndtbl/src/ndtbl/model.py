@@ -1,5 +1,6 @@
 """Define the public data model for ndtbl files."""
 
+import math
 from dataclasses import dataclass
 from typing import TypeAlias
 
@@ -40,8 +41,14 @@ class UniformAxis:
 
         if size < 1:
             raise ValueError("uniform axis must contain at least one point")
+        if not math.isfinite(min_value) or (
+            size > 1 and not math.isfinite(max_value)
+        ):
+            raise ValueError("uniform axis coordinates must be finite")
         if size > 1 and not max_value > min_value:
             raise ValueError("uniform axis requires max > min when size > 1")
+        if size > 1 and not math.isfinite(max_value - min_value):
+            raise ValueError("uniform axis span exceeds supported range")
         if size == 1:
             max_value = min_value
 
@@ -81,10 +88,14 @@ class ExplicitAxis:
             )
         if raw.size < 1:
             raise ValueError("explicit axis must contain at least one point")
-        if raw.size > 1 and np.any(np.diff(raw) <= 0.0):
+        if not np.all(np.isfinite(raw)):
+            raise ValueError("explicit axis coordinates must be finite")
+        if raw.size > 1 and np.any(raw[1:] <= raw[:-1]):
             raise ValueError(
                 "explicit axis coordinates must be strictly increasing"
             )
+        if raw.size > 1 and not math.isfinite(float(raw[-1]) - float(raw[0])):
+            raise ValueError("explicit axis span exceeds supported range")
         object.__setattr__(
             self, "coordinates_values", tuple(float(x) for x in raw)
         )

@@ -10,6 +10,7 @@
 #include <array>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -246,6 +247,23 @@ TEST_CASE("payload residency reports availability for supported storage",
 
   std::remove(path.c_str());
 }
+
+#if NDTBL_ENABLE_MMAP
+
+TEST_CASE("mmap loader rejects payload ranges whose end would overflow",
+          "[io][mmap]")
+{
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl_test::write_file_bytes(path, { 'x' });
+
+  REQUIRE_THROWS_AS(ndtbl::detail::map_payload_bytes(
+                      path, 1, std::numeric_limits<std::size_t>::max()),
+                    ndtbl::FormatError);
+
+  std::remove(path.c_str());
+}
+
+#endif
 
 #if NDTBL_ENABLE_MMAP_DIAGNOSTICS
 
@@ -649,6 +667,7 @@ TEST_CASE("typed loader rejects truncated payload files", "[io]")
   bytes.pop_back();
   ndtbl_test::write_file_bytes(path, bytes);
 
+  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), ndtbl::FormatError);
   REQUIRE_THROWS_AS(ndtbl::read_runtime_field_group<1>(path),
                     ndtbl::FormatError);
 
@@ -735,6 +754,32 @@ TEST_CASE("typed loader translates invalid file axes to format errors", "[io]")
   std::remove(path.c_str());
 }
 
+TEST_CASE("typed loader rejects non-finite file axes", "[io]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 0.0, 1.0 });
+
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, group);
+
+  std::vector<char> bytes = ndtbl_test::read_file_bytes(path);
+  std::vector<char> encoded_infinity;
+  ndtbl_test::append_double_le(encoded_infinity,
+                               std::numeric_limits<double>::infinity());
+  REQUIRE(bytes.size() >= 64 + encoded_infinity.size());
+  for (std::size_t index = 0; index < encoded_infinity.size(); ++index) {
+    bytes[64 + index] = encoded_infinity[index];
+  }
+  ndtbl_test::write_file_bytes(path, bytes);
+
+  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), ndtbl::FormatError);
+
+  std::remove(path.c_str());
+}
+
 TEST_CASE("typed loader rejects mismatched payload offsets", "[io]")
 {
   const std::array<ndtbl::Axis, 1> axes = {
@@ -751,6 +796,86 @@ TEST_CASE("typed loader rejects mismatched payload offsets", "[io]")
   for (std::size_t index = 12; index < 20; ++index) {
     bytes[index] = 0;
   }
+  ndtbl_test::write_file_bytes(path, bytes);
+
+  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), ndtbl::FormatError);
+
+  std::remove(path.c_str());
+}
+
+TEST_CASE("metadata reader bounds attacker-controlled sizes", "[io]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(2.0, 2.0, 1),
+  };
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 1.5 });
+
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, group);
+  std::vector<char> bytes = ndtbl_test::read_file_bytes(path);
+  REQUIRE(bytes.size() == 89);
+
+  SECTION("dimension is bounded before reserving axes")
+  {
+    ndtbl_test::overwrite_uint_le<std::uint64_t>(
+      bytes, 20, std::numeric_limits<std::uint64_t>::max());
+  }
+
+  SECTION("explicit extent is bounded before allocating coordinates")
+  {
+    bytes[44] = 2;
+    ndtbl_test::overwrite_uint_le<std::uint64_t>(
+      bytes, 48, std::numeric_limits<std::uint64_t>::max());
+  }
+
+  SECTION("field count is bounded before reserving names")
+  {
+    ndtbl_test::overwrite_uint_le<std::uint64_t>(
+      bytes, 28, std::numeric_limits<std::uint64_t>::max());
+    ndtbl_test::overwrite_uint_le<std::uint64_t>(bytes, 36, 0u);
+    bytes.resize(81);
+  }
+
+  SECTION("field name length is bounded before allocating a string")
+  {
+    ndtbl_test::overwrite_uint_le<std::uint64_t>(
+      bytes, 72, std::numeric_limits<std::uint64_t>::max());
+  }
+
+  SECTION("payload size arithmetic is checked")
+  {
+    ndtbl_test::overwrite_uint_le<std::uint64_t>(
+      bytes, 28, std::numeric_limits<std::uint64_t>::max());
+    ndtbl_test::overwrite_uint_le<std::uint64_t>(
+      bytes, 36, std::numeric_limits<std::uint64_t>::max());
+  }
+
+  SECTION("payload offset cannot exceed the file")
+  {
+    ndtbl_test::overwrite_uint_le<std::uint64_t>(
+      bytes, 12, std::numeric_limits<std::uint64_t>::max());
+  }
+
+  ndtbl_test::write_file_bytes(path, bytes);
+  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), ndtbl::FormatError);
+
+  std::remove(path.c_str());
+}
+
+TEST_CASE("metadata reader rejects trailing bytes", "[io]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(2.0, 2.0, 1),
+  };
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 1.5 });
+
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, group);
+
+  std::vector<char> bytes = ndtbl_test::read_file_bytes(path);
+  bytes.push_back('\0');
   ndtbl_test::write_file_bytes(path, bytes);
 
   REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), ndtbl::FormatError);
