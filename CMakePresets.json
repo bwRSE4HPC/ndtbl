@@ -99,5 +99,53 @@
         "outputOnFailure": true
       }
     }
+  ],
+  "workflowPresets": [
+    {
+      "name": "benchmark",
+      "displayName": "Configure and build benchmarks",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "benchmark"
+        },
+        {
+          "type": "build",
+          "name": "benchmark"
+        }
+      ]
+    },
+    {
+      "name": "documentation",
+      "displayName": "Configure and build documentation",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "documentation"
+        },
+        {
+          "type": "build",
+          "name": "documentation"
+        }
+      ]
+    },
+    {
+      "name": "test",
+      "displayName": "Configure, build, and test",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "test"
+        },
+        {
+          "type": "build",
+          "name": "test"
+        },
+        {
+          "type": "test",
+          "name": "test"
+        }
+      ]
+    }
   ]
 }
