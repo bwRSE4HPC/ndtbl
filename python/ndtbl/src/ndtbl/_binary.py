@@ -123,16 +123,19 @@ def _read_axis(stream: BinaryIO) -> UniformAxis | ExplicitAxis:
     _require_zero(_read_uint16(stream), "axis reserved field")
     size = _read_uint64(stream)
 
-    if axis_tag == AXIS_KIND_UNIFORM:
-        return UniformAxis(
-            min=_read_double(stream),
-            max=_read_double(stream),
-            size=size,
-        )
+    try:
+        if axis_tag == AXIS_KIND_UNIFORM:
+            return UniformAxis(
+                min=_read_double(stream),
+                max=_read_double(stream),
+                size=size,
+            )
 
-    if axis_tag == AXIS_KIND_EXPLICIT:
-        coordinates = [_read_double(stream) for _ in range(size)]
-        return ExplicitAxis(coordinates)
+        if axis_tag == AXIS_KIND_EXPLICIT:
+            coordinates = [_read_double(stream) for _ in range(size)]
+            return ExplicitAxis(coordinates)
+    except ValueError as error:
+        raise NdtblFormatError(str(error)) from error
 
     raise NdtblFormatError(f"unsupported ndtbl axis kind: {axis_tag}")
 

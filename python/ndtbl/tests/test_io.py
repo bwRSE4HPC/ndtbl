@@ -174,6 +174,23 @@ def test_read_metadata_rejects_unsupported_scalar_tag(
         read_metadata(path)
 
 
+def test_read_metadata_rejects_non_finite_axis_coordinates(
+    tmp_path,
+    sample_uniform_group: FieldGroup,
+) -> None:
+    path = tmp_path / "non-finite-axis.ndtbl"
+    write_group(path, sample_uniform_group)
+
+    data = bytearray(path.read_bytes())
+    struct.pack_into("<d", data, 64, float("inf"))
+    path.write_bytes(data)
+
+    with pytest.raises(
+        NdtblFormatError, match="uniform axis coordinates must be finite"
+    ):
+        read_metadata(path)
+
+
 def test_read_metadata_rejects_point_count_mismatch(
     tmp_path,
     sample_uniform_group: FieldGroup,
