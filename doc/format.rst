@@ -1,9 +1,7 @@
 Format
 ======
 
-The ``.ndtbl`` format stores one multidimensional field group in a compact
-binary layout with self-describing metadata followed by one contiguous payload
-block.
+The ``.ndtbl`` format stores one multidimensional field group in a compact binary layout with self-describing metadata followed by one contiguous payload block.
 
 On-disk encoding
 ----------------
@@ -61,11 +59,9 @@ Logical point traversal follows row-major / C-order over the grid axes:
 
 * axis ``0`` is the slowest-varying grid index
 * the last axis is the fastest-varying grid index
-* for each logical point, all field values are written consecutively in
-  ``field_names`` order
+* for each logical point, all field values are written consecutively in ``field_names`` order
 
-Equivalently, the payload is the flattened form of an array shaped as
-``(*axis_sizes, field_count)`` in C-order.
+Equivalently, the payload is the flattened form of an array shaped as ``(*axis_sizes, field_count)`` in C-order.
 
 Validation rules
 ----------------
@@ -75,4 +71,7 @@ Readers should reject files when:
 * reserved fields are nonzero
 * ``point_count`` does not match the product of axis extents
 * ``payload_offset`` does not match the parsed metadata length
+* an axis record, explicit coordinate array, or field name crosses ``payload_offset``
+* encoded counts or lengths cannot be represented safely or are not backed by enough bytes in the declared metadata or payload regions
+* the payload does not end exactly at the end of the file
 * encoded sizes exceed supported host limits

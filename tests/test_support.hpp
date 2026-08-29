@@ -87,6 +87,18 @@ append_uint_le(std::vector<char>& bytes, UInt value)
   }
 }
 
+template<class UInt>
+void
+overwrite_uint_le(std::vector<char>& bytes, std::size_t offset, UInt value)
+{
+  if (offset > bytes.size() || sizeof(UInt) > bytes.size() - offset) {
+    throw std::out_of_range("encoded integer exceeds test buffer");
+  }
+  for (std::size_t index = 0; index < sizeof(UInt); ++index) {
+    bytes[offset + index] = static_cast<char>((value >> (index * 8u)) & 0xffu);
+  }
+}
+
 inline void
 append_double_le(std::vector<char>& bytes, double value)
 {
