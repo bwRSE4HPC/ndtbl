@@ -753,6 +753,32 @@ TEST_CASE("typed loader translates invalid file axes to format errors", "[io]")
   std::remove(path.c_str());
 }
 
+TEST_CASE("typed loader rejects non-finite file axes", "[io]")
+{
+  const std::array<ndtbl::Axis, 1> axes = {
+    ndtbl::Axis::uniform(0.0, 1.0, 2),
+  };
+  const ndtbl::FieldGroup<1, double> group(
+    ndtbl::Grid<1>(axes), { "A" }, { 0.0, 1.0 });
+
+  const std::string path = ndtbl_test::temporary_path();
+  ndtbl::write_group(path, group);
+
+  std::vector<char> bytes = ndtbl_test::read_file_bytes(path);
+  std::vector<char> encoded_infinity;
+  ndtbl_test::append_double_le(encoded_infinity,
+                               std::numeric_limits<double>::infinity());
+  REQUIRE(bytes.size() >= 64 + encoded_infinity.size());
+  for (std::size_t index = 0; index < encoded_infinity.size(); ++index) {
+    bytes[64 + index] = encoded_infinity[index];
+  }
+  ndtbl_test::write_file_bytes(path, bytes);
+
+  REQUIRE_THROWS_AS(ndtbl::read_group_metadata(path), ndtbl::FormatError);
+
+  std::remove(path.c_str());
+}
+
 TEST_CASE("typed loader rejects mismatched payload offsets", "[io]")
 {
   const std::array<ndtbl::Axis, 1> axes = {

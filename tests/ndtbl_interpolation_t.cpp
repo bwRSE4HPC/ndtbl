@@ -447,6 +447,27 @@ TEST_CASE("axes reject non-finite query coordinates", "[axis][interpolation]")
   REQUIRE_THROWS_AS(explicit_axis.bracket(-infinity), std::out_of_range);
 }
 
+TEST_CASE("axes reject unsafe coordinate definitions", "[axis]")
+{
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double infinity = std::numeric_limits<double>::infinity();
+  const double largest = std::numeric_limits<double>::max();
+
+  REQUIRE_THROWS_AS(ndtbl::Axis::uniform(nan, 0.0, 1), std::invalid_argument);
+  REQUIRE_THROWS_AS(ndtbl::Axis::uniform(0.0, infinity, 2),
+                    std::invalid_argument);
+  REQUIRE_THROWS_AS(ndtbl::Axis::uniform(-largest, largest, 2),
+                    std::invalid_argument);
+  REQUIRE_NOTHROW(ndtbl::Axis::uniform(2.0, infinity, 1));
+
+  REQUIRE_THROWS_AS(ndtbl::Axis::from_coordinates({ 0.0, nan }),
+                    std::invalid_argument);
+  REQUIRE_THROWS_AS(ndtbl::Axis::from_coordinates({ 0.0, infinity }),
+                    std::invalid_argument);
+  REQUIRE_THROWS_AS(ndtbl::Axis::from_coordinates({ -largest, largest }),
+                    std::invalid_argument);
+}
+
 TEST_CASE("field group rejects uniform-axis queries outside the domain",
           "[field_group][interpolation]")
 {
