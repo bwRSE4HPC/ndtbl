@@ -180,7 +180,7 @@ jobs:
         flags: cpp
         plugins: noop
         token: ${{ secrets.CODECOV_TOKEN }}
-        slug: thomasisensee/ndtbl
+        slug: bwrse4hpc/ndtbl
         verbose: true
 
   test-python:
@@ -252,5 +252,5 @@ jobs:
         flags: python
         plugins: noop
         token: ${{ secrets.CODECOV_TOKEN }}
-        slug: thomasisensee/ndtbl
+        slug: bwrse4hpc/ndtbl
         verbose: true
