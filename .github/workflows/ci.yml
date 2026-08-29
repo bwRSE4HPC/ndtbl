@@ -116,6 +116,69 @@ jobs:
       shell: bash
       run: ctest --preset test
 
+  test-cmake-consumers:
+    name: CMake consumers on ${{matrix.os}}
+    needs: changes
+    if: ${{ needs.changes.outputs.cpp == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ${{matrix.os}}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Configure add_subdirectory consumer
+      shell: bash
+      run: >-
+        cmake
+        -S tests/add-subdirectory-consumer
+        -B build/add-subdirectory-consumer
+        -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build add_subdirectory consumer
+      shell: bash
+      run: >-
+        cmake
+        --build build/add-subdirectory-consumer
+        --config Release
+
+    - name: Configure package for installation
+      shell: bash
+      run: >-
+        cmake
+        -S .
+        -B build/install-producer
+        -DCMAKE_BUILD_TYPE=Release
+        -Dndtbl_BUILD_TESTING=OFF
+        -Dndtbl_BUILD_BENCHMARKS=OFF
+        -Dndtbl_BUILD_DOCS=OFF
+
+    - name: Install package
+      shell: bash
+      run: >-
+        cmake
+        --install build/install-producer
+        --config Release
+        --prefix "${{ runner.temp }}/ndtbl-install"
+
+    - name: Configure find_package consumer
+      shell: bash
+      run: >-
+        cmake
+        -S tests/install-consumer
+        -B build/install-consumer
+        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_PREFIX_PATH="${{ runner.temp }}/ndtbl-install"
+
+    - name: Build find_package consumer
+      shell: bash
+      run: >-
+        cmake
+        --build build/install-consumer
+        --config Release
+
   build-benchmarks:
     name: Build benchmarks on ${{matrix.os}}
     needs: changes
