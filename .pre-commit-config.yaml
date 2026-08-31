@@ -22,6 +22,10 @@ repos:
       - id: check-toml
       # Make sure that contained YAML files are well-formed
       - id: check-yaml
+      # Ensure consistent line endings
+      - id: mixed-line-ending
+      # Sort lines in requirements files
+      - id: requirements-txt-fixer
       # Trim trailing whitespace of all sorts
       - id: trailing-whitespace
 
@@ -46,3 +50,8 @@ repos:
     hooks:
       - id: nbstripout
         files: ".ipynb"
+
+  - repo: https://github.com/citation-file-format/cffconvert
+    rev: 054bda51dbe278b3e86f27c890e3f3ac877d616c
+    hooks:
+      - id: validate-cff
