@@ -51,7 +51,13 @@ The core API revolves around `FieldGroup`, `UniformAxis`, `ExplicitAxis`, `read_
 ```python
 import numpy as np
 
-from ndtbl import FieldGroup, UniformAxis, ExplicitAxis, read_group, write_group
+from ndtbl import (
+    FieldGroup,
+    UniformAxis,
+    ExplicitAxis,
+    read_group,
+    write_group,
+)
 
 group = FieldGroup(
     axes=(ExplicitAxis([0.0, 0.1, 1.0]), UniformAxis(10.0, 20.0, 2)),
