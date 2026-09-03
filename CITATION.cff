@@ -1,15 +1,19 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: ndtbl
-abstract: "Multidimensional table lookup library for C++."
+title: "ndtbl: A self-describing multidimensional table format and lookup toolkit"
+abstract: "A self-describing binary table format with C++ and Python tools for multidimensional interpolation, inspection, and optional memory-mapped access."
 authors:
   - family-names: Isensee
     given-names: Thomas
     affiliation: "Scientific Software Center (SSC), Interdisciplinary Center for Scientific Computing (IWR), Heidelberg University, Germany"
     orcid: "https://orcid.org/0000-0002-7242-4529"
 keywords:
-  - "table lookup"
+  - "memory mapping"
   - "multidimensional interpolation"
+  - "multidimensional tables"
+  - "scientific computing"
+  - "scientific data format"
+  - "table lookup"
 version: "0.3.0"
 date-released: "2026-08-26"
 license: MIT
