@@ -205,7 +205,7 @@ ctest --output-on-failure
 
 ## ⏱️ Benchmarks
 
-The lookup-time benchmarks use [Google Benchmark](https://github.com/google/benchmark) and measure query preparation, prepared evaluation, typed combined lookup, and runtime-erased combined lookup for representative 2D, 4D, and 6D tables. See [`benchmarks/README.md`](https://github.com/bwrse4hpc/ndtbl/tree/main/benchmarks) for the benchmark case definitions and interpretation.
+The lookup-time benchmarks use [Google Benchmark](https://github.com/google/benchmark) and measure query preparation, prepared evaluation, typed combined lookup, and runtime-erased combined lookup for 1D, 2D, 4D, and 8D tables with 65,536 grid points each. See [`benchmarks/README.md`](https://github.com/bwrse4hpc/ndtbl/tree/main/benchmarks) for the benchmark case definitions and interpretation.
 
 Build the benchmark target:
 
