@@ -21,8 +21,7 @@ constexpr std::size_t query_count = 1024;
 /**
  * @brief Return the per-axis extent used for a benchmark dimension.
  *
- * The extents keep memory use modest while covering 2D, 4D, and 6D stencil
- * sizes.
+ * Every grid has 65,536 points while covering 1D, 2D, 4D, and 8D stencil sizes.
  *
  * @tparam Dim Benchmark dimensionality.
  * @return Extent used for every axis in the selected dimensionality.
@@ -31,13 +30,15 @@ template<std::size_t Dim>
 constexpr std::size_t
 default_extent()
 {
-  if constexpr (Dim == 2) {
+  if constexpr (Dim == 1) {
+    return 65536;
+  } else if constexpr (Dim == 2) {
     return 256;
   } else if constexpr (Dim == 4) {
     return 16;
   } else {
-    static_assert(Dim == 6, "unsupported benchmark dimension");
-    return 6;
+    static_assert(Dim == 8, "benchmark dimensions must be 1, 2, 4, or 8");
+    return 4;
   }
 }
 
@@ -258,6 +259,11 @@ context(std::size_t extent, ndtbl::axis_kind axis_kind, std::size_t field_count)
     extent == default_extent<Dim>() ? extent : default_extent<Dim>();
 
   if (axis_kind == ndtbl::axis_kind::uniform) {
+    if (field_count == 1) {
+      static const LookupContext<Dim> uniform_1 =
+        make_context<Dim>(context_extent, ndtbl::axis_kind::uniform, 1);
+      return uniform_1;
+    }
     if (field_count == 2) {
       static const LookupContext<Dim> uniform_2 =
         make_context<Dim>(context_extent, ndtbl::axis_kind::uniform, 2);
@@ -273,6 +279,11 @@ context(std::size_t extent, ndtbl::axis_kind axis_kind, std::size_t field_count)
     return uniform_8;
   }
 
+  if (field_count == 1) {
+    static const LookupContext<Dim> explicit_1 = make_context<Dim>(
+      context_extent, ndtbl::axis_kind::explicit_coordinates, 1);
+    return explicit_1;
+  }
   if (field_count == 2) {
     static const LookupContext<Dim> explicit_2 = make_context<Dim>(
       context_extent, ndtbl::axis_kind::explicit_coordinates, 2);
@@ -461,10 +472,19 @@ bench_runtime_combined(benchmark::State& state,
  */
 #define NDTBL_REGISTER_LOOKUP_BENCHMARKS(DIM, EXTENT, LAYOUT, NAME)            \
   NDTBL_REGISTER_PREPARE_BENCHMARK(DIM, EXTENT, LAYOUT, NAME);                 \
+  NDTBL_REGISTER_FIELD_BENCHMARKS(DIM, EXTENT, LAYOUT, NAME##_fields_1, 1);    \
   NDTBL_REGISTER_FIELD_BENCHMARKS(DIM, EXTENT, LAYOUT, NAME##_fields_2, 2);    \
   NDTBL_REGISTER_FIELD_BENCHMARKS(DIM, EXTENT, LAYOUT, NAME##_fields_4, 4);    \
   NDTBL_REGISTER_FIELD_BENCHMARKS(DIM, EXTENT, LAYOUT, NAME##_fields_8, 8)
 
+NDTBL_REGISTER_LOOKUP_BENCHMARKS(1,
+                                 default_extent<1>(),
+                                 ndtbl::axis_kind::uniform,
+                                 d1_uniform);
+NDTBL_REGISTER_LOOKUP_BENCHMARKS(1,
+                                 default_extent<1>(),
+                                 ndtbl::axis_kind::explicit_coordinates,
+                                 d1_explicit);
 NDTBL_REGISTER_LOOKUP_BENCHMARKS(2,
                                  default_extent<2>(),
                                  ndtbl::axis_kind::uniform,
@@ -486,13 +506,13 @@ NDTBL_REGISTER_LOOKUP_BENCHMARKS(4,
                                  default_extent<4>(),
                                  ndtbl::axis_kind::explicit_coordinates,
                                  d4_explicit);
-NDTBL_REGISTER_LOOKUP_BENCHMARKS(6,
-                                 default_extent<6>(),
+NDTBL_REGISTER_LOOKUP_BENCHMARKS(8,
+                                 default_extent<8>(),
                                  ndtbl::axis_kind::uniform,
-                                 d6_uniform);
-NDTBL_REGISTER_LOOKUP_BENCHMARKS(6,
-                                 default_extent<6>(),
+                                 d8_uniform);
+NDTBL_REGISTER_LOOKUP_BENCHMARKS(8,
+                                 default_extent<8>(),
                                  ndtbl::axis_kind::explicit_coordinates,
-                                 d6_explicit);
+                                 d8_explicit);
 
 } // namespace
