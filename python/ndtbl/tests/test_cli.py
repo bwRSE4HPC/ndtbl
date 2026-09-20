@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Thomas Isensee
+# SPDX-License-Identifier: MIT
+
 import numpy as np
 
 from ndtbl import FieldGroup, UniformAxis, read_group, write_group

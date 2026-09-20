@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Thomas Isensee
+# SPDX-License-Identifier: MIT
+
 """Generate ndtbl field groups from compact grid specifications."""
 
 from dataclasses import dataclass
