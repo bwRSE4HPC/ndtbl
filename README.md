@@ -126,6 +126,23 @@ cmake -B build -Dndtbl_ENABLE_MMAP=ON -Dndtbl_ENABLE_MMAP_DIAGNOSTICS=ON
 cmake --build build
 ```
 
+Call `payload_residency()` on a loaded field group to sample its memory usage. With diagnostics enabled, the result also includes the containing mapping's NUMA placement from `/proc/self/numa_maps`:
+
+```cpp
+const auto info = group.payload_residency();
+if (info.numa_maps_available) {
+  std::cout << info.numa_maps_line << '\n';
+  std::cout << "NUMA policy: " << info.numa_maps_policy << '\n';
+  for (const auto& node : info.numa_maps_node_pages) {
+    std::cout << "Node " << node.first << ": " << node.second << " pages\n";
+  }
+}
+```
+
+Node IDs can be sparse. `numa_maps_kernel_page_size_bytes` reports the kernel page size when `numa_maps_kernel_page_size_available` is true. An available mapping with no node counters has an empty node map; unavailable proc data leaves `numa_maps_available` false without failing the residency query.
+
+These counters cover the whole virtual-memory mapping containing the payload. They describe pages mapped into this process and can differ from `mincore` residency, which can include file-cache pages not yet faulted into the process. Sample after accessing the table, for example before and after a computation, and log separately for each MPI rank. The snapshots are not atomic with the other residency measurements and do not measure CPU affinity or remote accesses. See the [Linux proc documentation](https://www.kernel.org/doc/html/latest/filesystems/proc.html) for the `numa_maps` format.
+
 ## ⚙️ C++ Tool Workflow
 
 Inspect existing `.ndtbl` files:

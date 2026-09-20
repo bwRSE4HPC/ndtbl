@@ -3,6 +3,8 @@
 #pragma once
 
 #include <cstddef>
+#include <map>
+#include <string>
 
 namespace ndtbl {
 
@@ -12,6 +14,7 @@ namespace ndtbl {
  * The mincore fields describe the queried payload range. The smaps fields
  * describe the Linux virtual-memory mapping that contains the payload address,
  * and the process VmLck fields describe all locked memory in the process.
+ * The numa_maps fields describe that same mapping, not just the payload.
  */
 struct residency_info
 {
@@ -40,6 +43,13 @@ struct residency_info
 
   bool process_vmlck_available = false;
   std::size_t process_vmlck_bytes = 0;
+
+  bool numa_maps_available = false;
+  std::string numa_maps_policy;
+  std::map<std::size_t, std::size_t> numa_maps_node_pages;
+  bool numa_maps_kernel_page_size_available = false;
+  std::size_t numa_maps_kernel_page_size_bytes = 0;
+  std::string numa_maps_line;
 };
 
 } // namespace ndtbl

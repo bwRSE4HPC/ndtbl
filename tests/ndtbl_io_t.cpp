@@ -202,6 +202,8 @@ TEST_CASE("payload residency reports availability for supported storage",
 
   REQUIRE_FALSE(group.payload_residency().available);
   REQUIRE_FALSE(runtime.payload_residency().available);
+  REQUIRE_FALSE(group.payload_residency().numa_maps_available);
+  REQUIRE_FALSE(runtime.payload_residency().numa_maps_available);
 
   const std::string path = ndtbl_test::temporary_path();
   ndtbl::write_group(path, group);
@@ -243,6 +245,8 @@ TEST_CASE("payload residency reports availability for supported storage",
 #else
   REQUIRE_FALSE(info.available);
   REQUIRE_FALSE(runtime_info.available);
+  REQUIRE_FALSE(info.numa_maps_available);
+  REQUIRE_FALSE(runtime_info.numa_maps_available);
 #endif
 
   std::remove(path.c_str());
@@ -266,6 +270,95 @@ TEST_CASE("mmap loader rejects payload ranges whose end would overflow",
 #endif
 
 #if NDTBL_ENABLE_MMAP_DIAGNOSTICS
+
+TEST_CASE("NUMA diagnostics match mapping starts and preserve sparse nodes",
+          "[io][mmap][diagnostics]")
+{
+  std::istringstream input(
+    "1000 default N0=99\n"
+    "3000 interleave:0,7 file=/tmp/table mapped=5 N0=2 N7=3 "
+    "kernelpagesize_kB=4\n"
+    "5000 default N1=88\n");
+  ndtbl::residency_info info;
+  ndtbl::detail::read_numa_maps_mapping(input, 0x3000, info);
+  REQUIRE(info.numa_maps_available);
+  REQUIRE(info.numa_maps_policy == "interleave:0,7");
+  REQUIRE(info.numa_maps_node_pages.size() == 2);
+  REQUIRE(info.numa_maps_node_pages.at(0) == 2);
+  REQUIRE(info.numa_maps_node_pages.at(7) == 3);
+  REQUIRE(info.numa_maps_kernel_page_size_available);
+  REQUIRE(info.numa_maps_kernel_page_size_bytes == 4096);
+  REQUIRE(info.numa_maps_line.find("file=/tmp/table") != std::string::npos);
+
+  std::istringstream empty_mapping("3000 default file=/tmp/table\n");
+  ndtbl::residency_info empty_info;
+  ndtbl::detail::read_numa_maps_mapping(empty_mapping, 0x3000, empty_info);
+  REQUIRE(empty_info.numa_maps_available);
+  REQUIRE(empty_info.numa_maps_node_pages.empty());
+  REQUIRE_FALSE(empty_info.numa_maps_kernel_page_size_available);
+
+  std::istringstream huge_mapping(
+    "3000 bind:7 huge N7=0 kernelpagesize_kB=2048\n");
+  ndtbl::residency_info huge_info;
+  ndtbl::detail::read_numa_maps_mapping(huge_mapping, 0x3000, huge_info);
+  REQUIRE(huge_info.numa_maps_available);
+  REQUIRE(huge_info.numa_maps_node_pages.at(7) == 0);
+  REQUIRE(huge_info.numa_maps_kernel_page_size_bytes == 2 * 1024 * 1024);
+}
+
+TEST_CASE("NUMA diagnostics reject missing and malformed mapping data",
+          "[io][mmap][diagnostics]")
+{
+  for (const auto& line :
+       { "",
+         "1000 default N0=3",
+         "3000",
+         "3000xyz default N0=3",
+         "3000 default N0=-1",
+         "3000 default N7=2x",
+         "3000 default N=2",
+         "3000 default N0=1 N0=2",
+         "3000 default N0=99999999999999999999999999999999",
+         "3000 default kernelpagesize_kB=9999999999999999999999999",
+         "3000 default kernelpagesize_kB=0" }) {
+    INFO(line);
+    std::istringstream input(line);
+    ndtbl::residency_info info;
+    ndtbl::detail::read_numa_maps_mapping(input, 0x3000, info);
+    REQUIRE_FALSE(info.numa_maps_available);
+    REQUIRE(info.numa_maps_node_pages.empty());
+  }
+}
+
+TEST_CASE("NUMA diagnostics find the mapping for an interior payload address",
+          "[io][mmap][diagnostics]")
+{
+  std::ifstream numa_maps("/proc/self/numa_maps");
+  if (!numa_maps.is_open()) {
+    SKIP("NUMA proc information is unavailable on this host");
+  }
+  const long page_size_long = sysconf(_SC_PAGESIZE);
+  REQUIRE(page_size_long > 0);
+  const auto page_size = static_cast<std::size_t>(page_size_long);
+  void* mapping = mmap(nullptr,
+                       page_size,
+                       PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANONYMOUS,
+                       -1,
+                       0);
+  REQUIRE(mapping != MAP_FAILED);
+  ndtbl::detail::mapped_payload_owner owner(mapping, page_size);
+  auto* payload = static_cast<unsigned char*>(mapping) + 17;
+  *static_cast<volatile unsigned char*>(payload) = 1;
+  const auto info = ndtbl::detail::query_residency(payload, 1);
+  REQUIRE(info.numa_maps_available);
+  REQUIRE_FALSE(info.numa_maps_policy.empty());
+  std::size_t pages = 0;
+  for (const auto& node : info.numa_maps_node_pages) {
+    pages += node.second;
+  }
+  REQUIRE(pages >= 1);
+}
 
 TEST_CASE("Linux proc memory diagnostic fields are parsed explicitly",
           "[io][mmap][diagnostics]")

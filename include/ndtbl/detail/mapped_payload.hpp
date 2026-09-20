@@ -42,6 +42,7 @@
 #include <fstream>
 #include <limits>
 #include <sstream>
+#include <utility>
 #include <vector>
 #endif
 
@@ -196,8 +197,94 @@ parse_smaps_vm_flags(const std::string& line,
   return true;
 }
 
+/** @brief Parse an unsigned decimal proc value without accepting overflow. */
+inline bool
+parse_proc_unsigned(const std::string& text, std::size_t& value)
+{
+  if (text.empty()) {
+    return false;
+  }
+  std::size_t parsed = 0;
+  for (const char c : text) {
+    if (c < '0' || c > '9') {
+      return false;
+    }
+    const auto digit = static_cast<std::size_t>(c - '0');
+    if (parsed > (std::numeric_limits<std::size_t>::max() - digit) / 10) {
+      return false;
+    }
+    parsed = parsed * 10 + digit;
+  }
+  value = parsed;
+  return true;
+}
+
 /**
- * @brief Add mapping-scoped Linux smaps measurements for the supplied address.
+ * @brief Read the exact mapping-start match from a Linux numa_maps stream.
+ *
+ * Missing data leaves availability clear. A valid mapping with no N tokens
+ * has an empty node map. Unknown fields are retained in the original line.
+ */
+inline void
+read_numa_maps_mapping(std::istream& input,
+                       std::uintptr_t mapping_start,
+                       residency_info& info)
+{
+  std::string line;
+  while (std::getline(input, line)) {
+    std::istringstream fields(line);
+    std::string address;
+    std::string policy;
+    if (!(fields >> address >> policy) ||
+        address.find_first_not_of("0123456789abcdefABCDEF") !=
+          std::string::npos) {
+      continue;
+    }
+    std::uintptr_t start = 0;
+    std::istringstream address_stream(address);
+    if (!(address_stream >> std::hex >> start) || start != mapping_start) {
+      continue;
+    }
+
+    std::map<std::size_t, std::size_t> nodes;
+    std::size_t page_size = 0;
+    bool page_size_available = false;
+    std::string token;
+    while (fields >> token) {
+      const auto equals = token.find('=');
+      if (equals == std::string::npos) {
+        continue;
+      }
+      std::size_t value = 0;
+      if (token.compare(0, equals, "kernelpagesize_kB") == 0) {
+        if (!parse_proc_unsigned(token.substr(equals + 1), value) ||
+            value == 0 ||
+            value > std::numeric_limits<std::size_t>::max() / 1024) {
+          return;
+        }
+        page_size = value * 1024;
+        page_size_available = true;
+      } else if (token[0] == 'N') {
+        std::size_t node = 0;
+        if (!parse_proc_unsigned(token.substr(1, equals - 1), node) ||
+            !parse_proc_unsigned(token.substr(equals + 1), value) ||
+            !nodes.emplace(node, value).second) {
+          return;
+        }
+      }
+    }
+    info.numa_maps_available = true;
+    info.numa_maps_policy = policy;
+    info.numa_maps_node_pages = std::move(nodes);
+    info.numa_maps_kernel_page_size_available = page_size_available;
+    info.numa_maps_kernel_page_size_bytes = page_size;
+    info.numa_maps_line = line;
+    return;
+  }
+}
+
+/**
+ * @brief Add mapping-scoped Linux smaps and numa_maps measurements.
  *
  * This locates the single virtual-memory mapping containing @p address and
  * records its size, RSS/PSS breakdown, locked bytes, and lock flags. Failure
@@ -236,6 +323,10 @@ query_smaps_mapping(const void* address, residency_info& info)
         info.smaps_available = true;
         info.smaps_mapping_bytes =
           static_cast<std::size_t>(mapping_end - mapping_start);
+        // numa_maps supplies only a start address: match the containing VMA
+        // found in smaps, since the payload may start inside that mapping.
+        std::ifstream numa_maps("/proc/self/numa_maps");
+        read_numa_maps_mapping(numa_maps, mapping_start, info);
       }
       continue;
     }
@@ -324,7 +415,7 @@ query_process_vmlck(residency_info& info)
  * @brief Query page residency and related Linux memory information for a byte
  * range.
  *
- * The range is expanded to whole pages for mincore. Mapping-scoped smaps data
+ * The range is expanded to whole pages for mincore. Mapping-scoped proc data
  * and process-scoped VmLck data are then attached when their proc files are
  * available.
  *
