@@ -46,6 +46,12 @@ The test build first tries to find an installed or parent-provided Catch2 packag
 
 The interpolation tests use polynomial fields because linear and cubic interpolation should recover matching low-order polynomials exactly. This makes correctness failures easier to interpret than using arbitrary tabulated data.
 
+## Python-to-C++ Workflow
+
+The [Python-to-C++ example](../examples/python_cpp/README.md) has a separate
+CTest check that generates a table in Python and verifies C++ interpolation.
+CI runs this workflow with the default heap-loaded reader.
+
 ## Not Currently Covered
 
 - Optional `mmap` behavior in realistic access patterns.

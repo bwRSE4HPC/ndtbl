@@ -26,6 +26,7 @@ The C++ reader can also be built with optional POSIX `mmap` memory mapping suppo
 - `benchmarks/`: C++ benchmarks
 - `cmake/`: CMake modules
 - `doc/`: Sphinx and Doxygen documentation
+- `examples/python_cpp/`: [Python-to-C++ example with an automated check](examples/python_cpp/README.md)
 - `include/ndtbl/`: public C++ headers
 - `python/ndtbl/`: pure-Python package and `ndtbl` CLI
 - `tests/`: Catch2-based C++ test suite

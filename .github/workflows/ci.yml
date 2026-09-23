@@ -37,6 +37,7 @@ jobs:
             - 'app/**'
             - 'benchmarks/**'
             - 'cmake/**'
+            - 'examples/**'
             - 'include/**'
             - 'src/**'
             - 'tests/**'
@@ -115,6 +116,35 @@ jobs:
     - name: Run tests
       shell: bash
       run: ctest --preset test
+
+  test-python-cpp-example:
+    name: Python-to-C++ example
+    needs: changes
+    if: ${{ needs.changes.outputs.cpp == 'true' || needs.changes.outputs.python == 'true' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.14"
+
+    - name: Install Python package
+      run: python -m pip install ./python/ndtbl
+
+    - name: Configure example
+      run: >-
+        cmake -S examples/python_cpp -B build/python-cpp
+        -DBUILD_TESTING=ON -Dndtbl_ENABLE_MMAP=OFF
+
+    - name: Build example
+      run: cmake --build build/python-cpp --config Release
+
+    - name: Check example
+      run: ctest --test-dir build/python-cpp -C Release --output-on-failure
 
   test-cmake-consumers:
     name: CMake consumers on ${{matrix.os}}
