@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Thomas Isensee
+# SPDX-License-Identifier: MIT
+
 """Provide the ndtbl command-line interface."""
 
 import logging

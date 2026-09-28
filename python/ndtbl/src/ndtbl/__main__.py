@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Thomas Isensee
+# SPDX-License-Identifier: MIT
+
 """Run the ndtbl command-line interface as a Python module."""
 
 from .cli import main

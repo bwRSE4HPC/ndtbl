@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Thomas Isensee
+# SPDX-License-Identifier: MIT
+
 """Create, inspect, and validate multidimensional ndtbl files."""
 
 from importlib import metadata

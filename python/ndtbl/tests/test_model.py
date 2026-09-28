@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Thomas Isensee
+# SPDX-License-Identifier: MIT
+
 import numpy as np
 import pytest
 from numpy.typing import ArrayLike
