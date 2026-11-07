@@ -95,14 +95,17 @@ target_sources(ndtbl
 # Compile flags for enabling mmap support and related features
 target_compile_definitions(ndtbl
   INTERFACE
-    NDTBL_ENABLE_MMAP=$<BOOL:${ndtbl_ENABLE_MMAP}>
-    NDTBL_ENABLE_MMAP_POPULATE=$<BOOL:${ndtbl_ENABLE_MMAP_POPULATE}>
-    NDTBL_ENABLE_MMAP_LOCK=$<BOOL:${ndtbl_ENABLE_MMAP_LOCK}>
-    NDTBL_ENABLE_MMAP_DIAGNOSTICS=$<BOOL:${ndtbl_ENABLE_MMAP_DIAGNOSTICS}>
+    $<BUILD_INTERFACE:NDTBL_ENABLE_MMAP=$<BOOL:${ndtbl_ENABLE_MMAP}>>
+    $<BUILD_INTERFACE:NDTBL_ENABLE_MMAP_POPULATE=$<BOOL:${ndtbl_ENABLE_MMAP_POPULATE}>>
+    $<BUILD_INTERFACE:NDTBL_ENABLE_MMAP_LOCK=$<BOOL:${ndtbl_ENABLE_MMAP_LOCK}>>
+    $<BUILD_INTERFACE:NDTBL_ENABLE_MMAP_DIAGNOSTICS=$<BOOL:${ndtbl_ENABLE_MMAP_DIAGNOSTICS}>>
 )
 
 if(LINUX AND ndtbl_ENABLE_MMAP_LOCK AND NOT ndtbl_ENABLE_MMAP_POPULATE)
-  target_compile_definitions(ndtbl INTERFACE _GNU_SOURCE)
+  target_compile_definitions(ndtbl
+    INTERFACE
+      _GNU_SOURCE
+  )
 endif()
 
 # Request a minimum C++ standard for this target
@@ -163,7 +166,8 @@ configure_package_config_file(
 install(
   FILES
     ${CMAKE_CURRENT_BINARY_DIR}/ndtblConfig.cmake
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ndtbl
+  DESTINATION
+    ${CMAKE_INSTALL_LIBDIR}/cmake/ndtbl
 )
 
 # Generate a version file
@@ -177,7 +181,8 @@ write_basic_package_version_file(
 install(
   FILES
     ${CMAKE_CURRENT_BINARY_DIR}/ndtblConfigVersion.cmake
-  DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ndtbl
+  DESTINATION
+    ${CMAKE_INSTALL_LIBDIR}/cmake/ndtbl
 )
 
 # Print a summary of found dependencies

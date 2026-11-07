@@ -127,6 +127,29 @@ cmake -B build -Dndtbl_ENABLE_MMAP=ON -Dndtbl_ENABLE_MMAP_DIAGNOSTICS=ON
 cmake --build build
 ```
 
+### Configuring consuming projects
+
+The `ndtbl_ENABLE_MMAP*` CMake options configure the local build, including consumers using `add_subdirectory()`. Installed targets intentionally export no mmap settings: consumers choose their own configuration, with all four macros defaulting to `0`.
+
+For an existing application target `my_app`:
+
+```cmake
+find_package(ndtbl CONFIG REQUIRED)
+
+target_link_libraries(my_app
+  PRIVATE
+    ndtbl::ndtbl
+)
+
+target_compile_definitions(my_app
+  PRIVATE
+    NDTBL_ENABLE_MMAP=1
+    NDTBL_ENABLE_MMAP_POPULATE=0
+    NDTBL_ENABLE_MMAP_LOCK=0
+    NDTBL_ENABLE_MMAP_DIAGNOSTICS=0
+)
+```
+
 ## ⚙️ C++ Tool Workflow
 
 Inspect existing `.ndtbl` files:
