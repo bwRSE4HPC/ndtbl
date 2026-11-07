@@ -185,6 +185,12 @@ install(
     ${CMAKE_INSTALL_LIBDIR}/cmake/ndtbl
 )
 
+# Install license
+install(
+  FILES LICENSE.md COPYING.md
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ndtbl
+)
+
 # Print a summary of found dependencies
 include(FeatureSummary)
 feature_summary(WHAT ALL)
