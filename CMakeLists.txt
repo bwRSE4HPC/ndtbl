@@ -191,6 +191,25 @@ install(
   DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/ndtbl
 )
 
+# Configure packaging
+if(PROJECT_IS_TOP_LEVEL)
+  set(CPACK_GENERATOR "TGZ;ZIP")
+  set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
+  set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+  set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
+  set(CPACK_PACKAGE_HOMEPAGE_URL "${PROJECT_HOMEPAGE_URL}")
+
+  set(CPACK_PACKAGE_FILE_NAME
+      "${CPACK_PACKAGE_NAME}-${CPACK_PACKAGE_VERSION}"
+  )
+
+  set(CPACK_PACKAGE_DIRECTORY
+      "${PROJECT_SOURCE_DIR}/dist"
+  )
+
+  include(CPack)
+endif()
+
 # Print a summary of found dependencies
 include(FeatureSummary)
 feature_summary(WHAT ALL)
