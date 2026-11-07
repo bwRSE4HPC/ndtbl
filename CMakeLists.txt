@@ -185,6 +185,12 @@ install(
     ${CMAKE_INSTALL_LIBDIR}/cmake/ndtbl
 )
 
+# Install README
+install(
+  FILES README.md
+  DESTINATION ${CMAKE_INSTALL_DOCDIR}
+)
+
 # Install license
 install(
   FILES LICENSE.md COPYING.md
