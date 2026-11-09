@@ -147,5 +147,17 @@
         }
       ]
     }
+  ],
+  "packagePresets": [
+    {
+      "name": "release",
+      "displayName": "Package ndtbl release",
+      "description": "Generate TGZ and ZIP release archives",
+      "configurePreset": "release",
+      "generators": [
+        "TGZ",
+        "ZIP"
+      ]
+    }
   ]
 }

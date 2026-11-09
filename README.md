@@ -45,7 +45,7 @@ Building the C++ project requires:
 
 - a C++14-compliant compiler for the header-only library interface
 - a compiler with C++20 support for the executables in `app/` and tests in `tests/`
-- CMake `>= 3.23`
+- CMake `>= 3.28`
 - Doxygen only if you want to build the documentation
 - Catch2 only if you want to build the optional C++ test suite
 
@@ -125,6 +125,87 @@ To enable mmap payload residency diagnostics on Linux:
 ```bash
 cmake -B build -Dndtbl_ENABLE_MMAP=ON -Dndtbl_ENABLE_MMAP_DIAGNOSTICS=ON
 cmake --build build
+```
+
+## 🔗 Integrating the C++ library
+
+You can include `ndtbl` as a git submodule, fetch it during CMake configuration, or use an installed package. All three methods provide the `ndtbl::ndtbl` target, which supplies the public include paths and requires at least C++14.
+
+The examples below assume your project already defines an application target named `my_app`.
+
+### Git submodule
+
+From your project's root directory, add the repository:
+
+```bash
+git submodule add https://github.com/bwrse4hpc/ndtbl.git external/ndtbl
+```
+
+Then add it to your project's `CMakeLists.txt` before linking your application:
+
+```cmake
+add_subdirectory(external/ndtbl EXCLUDE_FROM_ALL)
+target_link_libraries(my_app PRIVATE ndtbl::ndtbl)
+```
+
+Commit the submodule entry and `.gitmodules` to record the selected revision. When cloning your project, use `git clone --recurse-submodules`, or run `git submodule update --init --recursive` in an existing checkout.
+
+### CMake FetchContent
+
+To download `ndtbl` automatically during configuration, add this to your project's `CMakeLists.txt`:
+
+```cmake
+include(FetchContent)
+
+FetchContent_Declare(
+  ndtbl
+  GIT_REPOSITORY https://github.com/bwrse4hpc/ndtbl.git
+  GIT_TAG v0.3.0
+)
+FetchContent_MakeAvailable(ndtbl)
+
+target_link_libraries(my_app PRIVATE ndtbl::ndtbl)
+```
+
+Choose a release tag or full commit hash for `GIT_TAG` to select the version your project uses. Both source integration methods require CMake 3.28 or newer and leave the `ndtbl-inspect` executable out of the consuming project's build.
+
+### Installed package
+
+After installing `ndtbl` as described above, load its CMake package and link your application:
+
+```cmake
+find_package(ndtbl CONFIG REQUIRED)
+target_link_libraries(my_app PRIVATE ndtbl::ndtbl)
+```
+
+If you installed to a custom prefix, pass it when configuring your project:
+
+```bash
+cmake -S . -B build -DCMAKE_PREFIX_PATH=/desired/prefix
+cmake --build build
+```
+
+### Configuring mmap support
+
+The `ndtbl_ENABLE_MMAP*` CMake options configure the local build, including consumers using `add_subdirectory()`. Installed targets intentionally export no mmap settings: consumers choose their own configuration, with all four macros defaulting to `0`.
+
+For an existing application target `my_app`:
+
+```cmake
+find_package(ndtbl CONFIG REQUIRED)
+
+target_link_libraries(my_app
+  PRIVATE
+    ndtbl::ndtbl
+)
+
+target_compile_definitions(my_app
+  PRIVATE
+    NDTBL_ENABLE_MMAP=1
+    NDTBL_ENABLE_MMAP_POPULATE=0
+    NDTBL_ENABLE_MMAP_LOCK=0
+    NDTBL_ENABLE_MMAP_DIAGNOSTICS=0
+)
 ```
 
 ## ⚙️ C++ Tool Workflow
