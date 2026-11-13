@@ -102,6 +102,40 @@ jobs:
             --no-project \
             -- python -c "import ndtbl"
 
+  attest-dry-run:
+    name: Test provenance attestations
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_target == 'dry-run' }}
+    needs: [build, test-wheel]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download built distributions
+        uses: actions/download-artifact@v8
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Generate provenance attestations
+        uses: astral-sh/attest-action@v0.0.7
+
+      - name: Inspect distributions and attestations
+        run: |
+          ls -lah dist/
+          for file in dist/*.publish.attestation; do
+            echo "=== $file ==="
+            jq . "$file"
+          done
+
+      - name: Upload distributions and attestations
+        uses: actions/upload-artifact@v7
+        with:
+          name: attested-distributions
+          path: dist/*
+          if-no-files-found: error
+
   publish-testpypi:
     name: Publish to TestPyPI
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_target == 'testpypi' }}
@@ -127,7 +161,7 @@ jobs:
         uses: astral-sh/setup-uv@v10.0.1
 
       - name: Generate provenance attestations
-        uses: astral-sh/attest-action@0.0.7
+        uses: astral-sh/attest-action@v0.0.7
 
       - name: Show downloaded files
         run: |
@@ -166,7 +200,7 @@ jobs:
         uses: astral-sh/setup-uv@v10.0.1
 
       - name: Generate provenance attestations
-        uses: astral-sh/attest-action@0.0.7
+        uses: astral-sh/attest-action@v0.0.7
 
       - name: Show downloaded files
         run: |
