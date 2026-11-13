@@ -93,6 +93,8 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: false
 
       - name: Test wheel installation and import
         run: |
