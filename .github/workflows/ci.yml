@@ -33,7 +33,7 @@ jobs:
       with:
         filters: |
           cpp:
-            - '.github/workflows/**'
+            - '.github/workflows/ci.yml'
             - 'app/**'
             - 'benchmarks/**'
             - 'cmake/**'
@@ -44,7 +44,7 @@ jobs:
             - 'CMakeLists.txt'
             - 'CMakePresets.json'
           python:
-            - '.github/workflows/**'
+            - '.github/workflows/ci.yml'
             - 'python/**'
 
   build-and-test-cpp:
