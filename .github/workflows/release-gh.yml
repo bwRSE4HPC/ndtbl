@@ -13,6 +13,19 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure release package
+        run: cmake --preset release -DCMAKE_INSTALL_LIBDIR=lib
+
+      - name: Create release archives
+        run: cpack --preset release
+
       - uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist/ndtbl-*.tar.gz
+            dist/ndtbl-*.zip
