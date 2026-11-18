@@ -1,6 +1,9 @@
 name: Publish on PyPI and TestPyPI
 
 on:
+  push:
+    tags:
+      - "py-v*"
   workflow_dispatch:
     inputs:
       publish_target:
@@ -11,9 +14,6 @@ on:
         options:
           - dry-run
           - testpypi
-  push:
-    tags:
-      - "py-v*"
 
 jobs:
   build:

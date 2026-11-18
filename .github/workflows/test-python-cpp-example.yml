@@ -1,0 +1,33 @@
+name: Test Python-to-C++ example
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  test-python-cpp-example:
+    name: Python-to-C++ example
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.14"
+
+    - name: Install Python package
+      run: python -m pip install ./python/ndtbl
+
+    - name: Configure example
+      run: >-
+        cmake -S examples/python_cpp -B build/python-cpp
+        -DBUILD_TESTING=ON -Dndtbl_ENABLE_MMAP=OFF
+
+    - name: Build example
+      run: cmake --build build/python-cpp
+
+    - name: Check example
+      run: ctest --test-dir build/python-cpp --output-on-failure

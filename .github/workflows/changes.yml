@@ -1,0 +1,57 @@
+name: Detect changes
+
+on:
+  workflow_call:
+    outputs:
+      cpp:
+        description: Whether C++ checks are needed
+        value: ${{ jobs.changes.outputs.cpp }}
+      python:
+        description: Whether Python checks are needed
+        value: ${{ jobs.changes.outputs.python }}
+  workflow_dispatch:
+
+jobs:
+  changes:
+    name: Check for changes in C++ and Python directories
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      cpp: ${{ steps.filter.outputs.cpp }}
+      python: ${{ steps.filter.outputs.python }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Filter changes
+      uses: dorny/paths-filter@v4
+      id: filter
+      with:
+        filters: |
+          cpp:
+            - '.github/workflows/build-and-test-cpp.yml'
+            - '.github/workflows/test-python-cpp-example.yml'
+            - '.github/workflows/test-cmake-consumers.yml'
+            - '.github/workflows/build-benchmarks.yml'
+            - '.github/workflows/ci.yml'
+            - '.github/workflows/changes.yml'
+            - '.github/workflows/coverage.yml'
+            - 'app/**'
+            - 'benchmarks/**'
+            - 'cmake/**'
+            - 'examples/**'
+            - 'include/**'
+            - 'src/**'
+            - 'tests/**'
+            - 'CMakeLists.txt'
+            - 'CMakePresets.json'
+          python:
+            - '.github/workflows/test-python.yml'
+            - '.github/workflows/test-python-cpp-example.yml'
+            - '.github/workflows/ci.yml'
+            - '.github/workflows/changes.yml'
+            - '.github/workflows/coverage.yml'
+            - 'python/**'
