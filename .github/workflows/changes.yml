@@ -1,0 +1,129 @@
+name: Detect changes
+
+on:
+  workflow_call:
+    outputs:
+      ci:
+        description: Whether ci files changed
+        value: ${{ jobs.changes.outputs.ci }}
+      cpp_core:
+        description: Whether cpp core files changed
+        value: ${{ jobs.changes.outputs.cpp_core }}
+      cpp_tests:
+        description: Whether cpp tests files changed
+        value: ${{ jobs.changes.outputs.cpp_tests }}
+      cpp_consumers:
+        description: Whether cpp consumers files changed
+        value: ${{ jobs.changes.outputs.cpp_consumers }}
+      app:
+        description: Whether app files changed
+        value: ${{ jobs.changes.outputs.app }}
+      python_core:
+        description: Whether python core files changed
+        value: ${{ jobs.changes.outputs.python_core }}
+      python_tests:
+        description: Whether python tests files changed
+        value: ${{ jobs.changes.outputs.python_tests }}
+      benchmarks:
+        description: Whether benchmarks files changed
+        value: ${{ jobs.changes.outputs.benchmarks }}
+      examples:
+        description: Whether examples files changed
+        value: ${{ jobs.changes.outputs.examples }}
+      coverage:
+        description: Whether coverage files changed
+        value: ${{ jobs.changes.outputs.coverage }}
+      cpp_workflow:
+        description: Whether cpp workflow files changed
+        value: ${{ jobs.changes.outputs.cpp_workflow }}
+      consumers_workflow:
+        description: Whether consumers workflow files changed
+        value: ${{ jobs.changes.outputs.consumers_workflow }}
+      benchmarks_workflow:
+        description: Whether benchmarks workflow files changed
+        value: ${{ jobs.changes.outputs.benchmarks_workflow }}
+      python_workflow:
+        description: Whether python workflow files changed
+        value: ${{ jobs.changes.outputs.python_workflow }}
+      examples_workflow:
+        description: Whether examples workflow files changed
+        value: ${{ jobs.changes.outputs.examples_workflow }}
+  workflow_dispatch:
+
+jobs:
+  changes:
+    name: Detect changes affecting CI checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      ci: ${{ steps.filter.outputs.ci }}
+      cpp_core: ${{ steps.filter.outputs.cpp_core }}
+      cpp_tests: ${{ steps.filter.outputs.cpp_tests }}
+      cpp_consumers: ${{ steps.filter.outputs.cpp_consumers }}
+      app: ${{ steps.filter.outputs.app }}
+      python_core: ${{ steps.filter.outputs.python_core }}
+      python_tests: ${{ steps.filter.outputs.python_tests }}
+      benchmarks: ${{ steps.filter.outputs.benchmarks }}
+      examples: ${{ steps.filter.outputs.examples }}
+      coverage: ${{ steps.filter.outputs.coverage }}
+      cpp_workflow: ${{ steps.filter.outputs.cpp_workflow }}
+      consumers_workflow: ${{ steps.filter.outputs.consumers_workflow }}
+      benchmarks_workflow: ${{ steps.filter.outputs.benchmarks_workflow }}
+      python_workflow: ${{ steps.filter.outputs.python_workflow }}
+      examples_workflow: ${{ steps.filter.outputs.examples_workflow }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Filter changes
+      uses: dorny/paths-filter@v4
+      id: filter
+      with:
+        # PRs use their base branch; pushes compare with the previous pushed state.
+        base: ${{ github.ref }}
+        # Each filter has one positive glob; braces express alternatives.
+        # Every exclusion must also match, so Markdown alone never selects tests.
+        predicate-quantifier: every
+        filters: |
+          ci:
+            - '.github/workflows/{ci,changes}.yml'
+          cpp_core:
+            - '{include/**,src/**,cmake/**,CMakeLists.txt,CMakePresets.json}'
+            - '!**/*.md'
+          cpp_tests:
+            - 'tests/**'
+            - '!tests/{consumer,add-subdirectory-consumer,install-consumer}/**'
+            - '!**/*.md'
+          cpp_consumers:
+            - 'tests/{consumer,add-subdirectory-consumer,install-consumer}/**'
+            - '!**/*.md'
+          app:
+            - 'app/**'
+            - '!**/*.md'
+          python_core:
+            - 'python/ndtbl/{src/**,pyproject.toml}'
+            - '!**/*.md'
+          python_tests:
+            - 'python/ndtbl/tests/**'
+            - '!**/*.md'
+          benchmarks:
+            - 'benchmarks/**'
+            - '!**/*.md'
+          examples:
+            - 'examples/python_cpp/**'
+            - '!**/*.md'
+          coverage:
+            - '{.github/workflows/coverage.yml,codecov.yml}'
+          cpp_workflow:
+            - '.github/workflows/build-and-test-cpp.yml'
+          consumers_workflow:
+            - '.github/workflows/test-cmake-consumers.yml'
+          benchmarks_workflow:
+            - '.github/workflows/build-benchmarks.yml'
+          python_workflow:
+            - '.github/workflows/test-python.yml'
+          examples_workflow:
+            - '.github/workflows/test-python-cpp-example.yml'

@@ -1,0 +1,115 @@
+name: Coverage
+
+on:
+  workflow_call:
+    inputs:
+      cpp:
+        description: Run C++ coverage
+        type: boolean
+        default: false
+      python:
+        description: Run Python coverage
+        type: boolean
+        default: false
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+  workflow_dispatch:
+    inputs:
+      cpp:
+        description: Run C++ coverage
+        type: boolean
+        default: true
+      python:
+        description: Run Python coverage
+        type: boolean
+        default: true
+
+jobs:
+  coverage-test-cpp:
+    name: Coverage Testing C++
+    if: ${{ inputs.cpp }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Install LCov
+      run: |
+        sudo apt-get install -y lcov
+
+    - name: Configure CMake
+      shell: bash
+      run: |
+        cmake \
+          --preset test \
+          -DCMAKE_CXX_FLAGS="--coverage -fprofile-update=atomic -O0 -g" \
+          -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+
+    - name: Build
+      shell: bash
+      run: cmake --build --preset test
+
+    - name: Run tests
+      shell: bash
+      run: ctest --preset test
+
+    - name: Collect coverage report
+      shell: bash
+      working-directory: ${{ github.workspace }}/build
+      run: |
+        lcov --directory . --capture --output-file coverage.info --ignore-errors mismatch,unused --exclude '*/catch2/*'
+
+    - name: Upload C++ coverage to Codecov
+      uses: codecov/codecov-action@v7
+      with:
+        disable_search: true
+        fail_ci_if_error: true
+        files: ${{github.workspace}}/build/coverage.info
+        flags: cpp
+        plugins: noop
+        token: ${{ secrets.CODECOV_TOKEN }}
+        slug: bwrse4hpc/ndtbl
+        verbose: true
+
+  coverage-test-python:
+    name: Coverage Testing Python
+    if: ${{ inputs.python }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.15"
+
+    - name: Install Python packages
+      working-directory: ${{ github.workspace }}/python/ndtbl/
+      run: |
+        python -m pip install -e .[tests]
+
+    - name: Run Python tests
+      working-directory: ${{ github.workspace }}/python/ndtbl/
+      run: |
+        python -m pytest --cov=src --cov-branch --cov-report=xml
+
+    - name: Inspect Python coverage XML
+      working-directory: ${{ github.workspace }}/python/ndtbl/
+      run: |
+        grep -o 'filename="[^"]*"' coverage.xml | head -n 1000
+
+    - name: Upload Python coverage to Codecov
+      uses: codecov/codecov-action@v7
+      with:
+        disable_search: true
+        fail_ci_if_error: true
+        files: ${{github.workspace}}/python/ndtbl/coverage.xml
+        flags: python
+        plugins: noop
+        token: ${{ secrets.CODECOV_TOKEN }}
+        slug: bwrse4hpc/ndtbl
+        verbose: true
