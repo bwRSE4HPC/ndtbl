@@ -18,35 +18,83 @@ jobs:
 
   build-and-test-cpp:
     needs: changes
-    if: ${{ needs.changes.outputs.cpp == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          || needs.changes.outputs.ci == 'true'
+          || needs.changes.outputs.cpp_core == 'true'
+          || needs.changes.outputs.cpp_tests == 'true'
+          || needs.changes.outputs.app == 'true'
+          || needs.changes.outputs.cpp_workflow == 'true' }}
     uses: ./.github/workflows/build-and-test-cpp.yml
 
   test-python-cpp-example:
     needs: changes
-    if: ${{ needs.changes.outputs.cpp == 'true' || needs.changes.outputs.python == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          || needs.changes.outputs.ci == 'true'
+          || needs.changes.outputs.cpp_core == 'true'
+          || needs.changes.outputs.python_core == 'true'
+          || needs.changes.outputs.examples == 'true'
+          || needs.changes.outputs.examples_workflow == 'true' }}
     uses: ./.github/workflows/test-python-cpp-example.yml
 
   test-cmake-consumers:
     needs: changes
-    if: ${{ needs.changes.outputs.cpp == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          || needs.changes.outputs.ci == 'true'
+          || needs.changes.outputs.cpp_core == 'true'
+          || needs.changes.outputs.cpp_consumers == 'true'
+          || needs.changes.outputs.app == 'true'
+          || needs.changes.outputs.consumers_workflow == 'true' }}
     uses: ./.github/workflows/test-cmake-consumers.yml
 
   build-benchmarks:
     needs: changes
-    if: ${{ needs.changes.outputs.cpp == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          || needs.changes.outputs.ci == 'true'
+          || needs.changes.outputs.cpp_core == 'true'
+          || needs.changes.outputs.benchmarks == 'true'
+          || needs.changes.outputs.app == 'true'
+          || needs.changes.outputs.benchmarks_workflow == 'true' }}
     uses: ./.github/workflows/build-benchmarks.yml
 
   test-python:
     needs: changes
-    if: ${{ needs.changes.outputs.python == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          || needs.changes.outputs.ci == 'true'
+          || needs.changes.outputs.python_core == 'true'
+          || needs.changes.outputs.python_tests == 'true'
+          || needs.changes.outputs.python_workflow == 'true' }}
     uses: ./.github/workflows/test-python.yml
 
   coverage:
     needs: changes
-    if: ${{ needs.changes.outputs.cpp == 'true' || needs.changes.outputs.python == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch'
+          || needs.changes.outputs.ci == 'true'
+          || needs.changes.outputs.cpp_core == 'true'
+          || needs.changes.outputs.cpp_tests == 'true'
+          || needs.changes.outputs.app == 'true'
+          || needs.changes.outputs.coverage == 'true'
+          || needs.changes.outputs.python_core == 'true'
+          || needs.changes.outputs.python_tests == 'true' }}
     uses: ./.github/workflows/coverage.yml
     with:
-      cpp: ${{ needs.changes.outputs.cpp == 'true' || github.event_name == 'workflow_dispatch' }}
-      python: ${{ needs.changes.outputs.python == 'true' || github.event_name == 'workflow_dispatch' }}
+      cpp: >-
+        ${{ github.event_name == 'workflow_dispatch'
+            || needs.changes.outputs.ci == 'true'
+            || needs.changes.outputs.cpp_core == 'true'
+            || needs.changes.outputs.cpp_tests == 'true'
+            || needs.changes.outputs.app == 'true'
+            || needs.changes.outputs.coverage == 'true' }}
+      python: >-
+        ${{ github.event_name == 'workflow_dispatch'
+            || needs.changes.outputs.ci == 'true'
+            || needs.changes.outputs.python_core == 'true'
+            || needs.changes.outputs.python_tests == 'true'
+            || needs.changes.outputs.coverage == 'true' }}
     secrets:
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
